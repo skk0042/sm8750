@@ -30,7 +30,7 @@ on:
         description: '是否安装 lz4 1.10.0+zstd 1.5.7 补丁及 LZ4KD 补丁(0=均不安装,1=安装lz4&zstd补丁,2=安装lz4kd补丁,3=均安装,默认1)'
         required: true
         type: choice
-        default: '1'
+        default: '3'
         options:
           - '0'
           - '1'
@@ -656,12 +656,9 @@ jobs:
             echo "未找到内核镜像文件，构建可能出错"
             exit 1
           fi
-          if [[ ${{ github.event.inputs.ksu_type }} == "sukisu" ]]; then
-            KSU_TYPENAME="SukiSU"
-          else
-            KSU_TYPENAME="KSUNext"
-          fi
+          
           if [[ "${{ github.event.inputs.lz4_enable }}" == "2" || "${{ github.event.inputs.lz4_enable }}" == "3" ]]; then
+            echo "正在下载 zram 模块..."
             wget https://raw.githubusercontent.com/cctv18/oppo_oplus_realme_sm8750/refs/heads/main/zram.zip
           fi
           
@@ -675,15 +672,8 @@ jobs:
           echo "生成 AK3 包: $AK3_NAME"
           zip -r ../${AK3_NAME} ./*
 
-      - name: 上传 Ccache 调试日志
-        if: always() && inputs.ccache_debug
-        uses: actions/upload-artifact@v4
-        with:
-          name: ccache-debug-log
-          path: ${{ github.workspace }}/kernel_workspace/ccache.log
-
       - name: 上传 AK3 刷机包
         uses: actions/upload-artifact@v4
         with:
-          name: AK3_SukiSU_${{ env.KSUVER }}_6.6.66
+          name: ${{ github.event.inputs.ksu_type == 'sukisu' && 'AK3_SukiSU' || 'AK3_KSUNext' }}_${{ env.KSUVER }}_6.6.66
           path: ${{ github.workspace }}/kernel_workspace/AK3_*.zip
