@@ -210,7 +210,7 @@ jobs:
             # 创建版本定义模板&版本格式函数: 使用获取的提交哈希和固定后缀
             # KSU_VERSION_API: API 版本定义
             # KSU_VERSION_FULL: 完整版本定义
-            VERSION_DEFINITIONS=$'define get_ksu_version_full\nv\\$1-'"$GIT_COMMIT_HASH"$'@山河昴\nendef\n\nKSU_VERSION_API := '"$KSU_API_VERSION"$'\nKSU_VERSION_FULL := v'"$KSU_API_VERSION"$'-'"$GIT_COMMIT_HASH"$'@山河昴'
+            VERSION_DEFINITIONS=$'define get_ksu_version_full\nv\\$1-'"$GIT_COMMIT_HASH"$'@安和昴\nendef\n\nKSU_VERSION_API := '"$KSU_API_VERSION"$'\nKSU_VERSION_FULL := v'"$KSU_API_VERSION"$'-'"$GIT_COMMIT_HASH"$'@安和昴'
             # 清理内核 Makefile 中的旧版本定义
             # 删除版本函数
             sed -i '/define get_ksu_version_full/,/endef/d' kernel/Makefile
@@ -237,7 +237,7 @@ jobs:
             # 验证修改结果
             grep -A10 "REPO_OWNER" kernel/Makefile  # 检查插入点后的内容
             grep "KSU_VERSION_FULL" kernel/Makefile # 确认版本定义存在
-            echo "SukiSU版本号: v${KSU_API_VERSION}-${GIT_COMMIT_HASH}@山河昴"
+            echo "SukiSU版本号: v${KSU_API_VERSION}-${GIT_COMMIT_HASH}@安和昴"
           else
             echo "正在配置KernelSU Next..."
             curl -LSs "https://raw.githubusercontent.com/pershoot/KernelSU-Next/next-susfs/kernel/setup.sh" | bash -s next-susfs
@@ -655,11 +655,6 @@ jobs:
           if [[ ! -f ./Image ]]; then
             echo "未找到内核镜像文件，构建可能出错"
             exit 1
-          fi
-          
-          if [[ "${{ github.event.inputs.lz4_enable }}" == "2" || "${{ github.event.inputs.lz4_enable }}" == "3" ]]; then
-            echo "正在下载 zram 模块..."
-            wget https://raw.githubusercontent.com/cctv18/oppo_oplus_realme_sm8750/refs/heads/main/zram.zip
           fi
           
           # 生成 AK3 包名称
