@@ -124,27 +124,22 @@ jobs:
           
           wait
           echo "所有源码及llvm-Clang18工具链初始化完成！"
-          echo "正在去除 ABI 保护 & 去除 dirty 后缀..."
-          rm common/android/abi_gki_protected_exports_* || true
-          for f in common/scripts/setlocalversion; do
-            sed -i 's/ -dirty//g' "$f"
-            sed -i '$i res=$(echo "$res" | sed '\''s/-dirty//g'\'')' "$f"
           done
 
       - name: 配置ccache目录
         run: |
-          echo "CCACHE_DIR=$HOME/.ccache_6.6.66" >> $GITHUB_ENV
+          echo "CCACHE_DIR=$HOME/.ccache_6.12.X" >> $GITHUB_ENV
           echo "CCACHE_MAXSIZE=3G" >> $GITHUB_ENV
           echo "当前磁盘空间："
           df -h
-          echo "当前构建内核版本：6.6.66"
+          echo "当前构建内核版本：6.12.X"
 
       - name: 载入当前版本内核的 ccache缓存
         uses: actions/cache@v4
         id: ccache-restore
         with:
           path: ${{ env.CCACHE_DIR }}
-          key: ccache-neov4-6.6.66-${{ runner.os }}-main
+          key: ccache-neov4-6.12.X-${{ runner.os }}-main
           restore-keys: |
             ccache-neov4-6.6.66-${{ runner.os }}-
             ccache-neov4-6.6.66-
