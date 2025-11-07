@@ -644,43 +644,41 @@ jobs:
           echo "编译后空间:"
           df -h
          
-          
       - name: Make AnyKernel3
-  run: |
-    cd kernel_workspace
-    git clone https://github.com/skk0042/AnyKernel3 --depth=1
-    rm -rf ./AnyKernel3/.git
-    mkdir -p common/out/Final-Image-Find/
-    dir1=""
-    dir2=""
-    image_path=$(find "./common/out/" -name "Image" | head -n 1)
-    if [ -n "$image_path" ]; then
-      dir1=$(dirname "$image_path")/
-      echo "使用 make 编译的统一路径，成功找到 Image 文件"
-    else
-      image_path=$(find "./" -name "Image" | head -n 1)
-      if [ -n "$image_path" ]; then
-        dir2=$(dirname "$image_path")/
-        echo "使用其他编译方式，成功找到 Image 文件"
-      else
-        echo "未找到 Image 文件，构建失败" >&2
-        exit 1
-      fi
-    fi
-    if [ -n "$image_path" ] && [ -f "$image_path" ]; then
-      echo "Image file finally located at: $image_path"
-      cp "$image_path" ./AnyKernel3/Image
-      cp "$image_path" common/out/Final-Image-Find/Image
-    fi
+        run: |
+          cd kernel_workspace
+          git clone https://github.com/skk0042/AnyKernel3 --depth=1
+          rm -rf ./AnyKernel3/.git
+          mkdir -p common/out/Final-Image-Find/
+          dir1=""
+          dir2=""
+          image_path=$(find "./common/out/" -name "Image" | head -n 1)
+          if [ -n "$image_path" ]; then
+            dir1=$(dirname "$image_path")/
+            echo "使用 make 编译的统一路径，成功找到 Image 文件"
+          else
+            image_path=$(find "./" -name "Image" | head -n 1)
+            if [ -n "$image_path" ]; then
+              dir2=$(dirname "$image_path")/
+              echo "使用其他编译方式，成功找到 Image 文件"
+            else
+              echo "未找到 Image 文件，构建失败" >&2
+              exit 1
+            fi
+          fi
+          if [ -n "$image_path" ] && [ -f "$image_path" ]; then
+            echo "Image file finally located at: $image_path"
+            cp "$image_path" ./AnyKernel3/Image
+            cp "$image_path" common/out/Final-Image-Find/Image
+          fi
 
-      
       - name: Set zip Suffix
-  id: suffix
-  run: |
-    echo "value=${{ github.event.inputs.lz4_enable != '0' && '_LZ4KD' || '' }}${{ github.event.inputs.baseband_guard == 'true' && '_LSM' || '' }}${{ github.event.inputs.hook_method == 'kprobes' && '_KP' || github.event.inputs.hook_method == 'manual' && '_VFS' || github.event.inputs.hook_method == 'syscall' && '_TP' || '' }}${{ github.event.inputs.adios_rekernel_enable != '0' && '_SCHED' || '' }}" >> $GITHUB_OUTPUT
+        id: suffix
+        run: |
+          echo "value=${{ github.event.inputs.lz4_enable != '0' && '_LZ4KD' || '' }}${{ github.event.inputs.baseband_guard == 'true' && '_LSM' || '' }}${{ github.event.inputs.hook_method == 'kprobes' && '_KP' || github.event.inputs.hook_method == 'manual' && '_VFS' || github.event.inputs.hook_method == 'syscall' && '_TP' || '' }}${{ github.event.inputs.adios_rekernel_enable != '0' && '_SCHED' || '' }}" >> $GITHUB_OUTPUT
 
       - name: Upload AnyKernel3
-  uses: actions/upload-artifact@v4
-  with:
-    name: AnyKernel3_${{ github.event.inputs.ksu_type == 'sukisu' && 'SukiSU' || 'KSUNext' }}_${{ env.KSUVER }}_6.6.66${{ steps.suffix.outputs.value }}
-    path: ./AnyKernel3/*
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnyKernel3_${{ github.event.inputs.ksu_type == 'sukisu' && 'SukiSU' || 'KSUNext' }}_${{ env.KSUVER }}_6.6.66${{ steps.suffix.outputs.value }}
+          path: ./AnyKernel3/*
