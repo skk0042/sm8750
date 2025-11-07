@@ -676,9 +676,19 @@ jobs:
         id: suffix
         run: |
           echo "value=${{ github.event.inputs.lz4_enable != '0' && '_LZ4KD' || '' }}${{ github.event.inputs.baseband_guard == 'true' && '_LSM' || '' }}${{ github.event.inputs.hook_method == 'kprobes' && '_KP' || github.event.inputs.hook_method == 'manual' && '_VFS' || github.event.inputs.hook_method == 'syscall' && '_TP' || '' }}${{ github.event.inputs.adios_rekernel_enable != '0' && '_SCHED' || '' }}" >> $GITHUB_OUTPUT
-
+          
+      - name: Debug Check AnyKernel3 Directory
+        run: |
+          cd kernel_workspace
+          echo "当前目录内容："
+          ls -la
+          echo "AnyKernel3 目录内容："
+          ls -la AnyKernel3/ || echo "AnyKernel3 目录不存在"
+          echo "Image 文件是否存在："
+          find . -name "Image" -type f | head -5
+          
       - name: Upload AnyKernel3
         uses: actions/upload-artifact@v4
         with:
           name: AnyKernel3_${{ github.event.inputs.ksu_type == 'sukisu' && 'SukiSU' || 'KSUNext' }}_${{ env.KSUVER }}_6.6.66${{ steps.suffix.outputs.value }}
-          path: ./AnyKernel3/*
+          path: kernel_workspace/AnyKernel3/*
