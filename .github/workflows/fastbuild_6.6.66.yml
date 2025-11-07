@@ -690,5 +690,5 @@ jobs:
       - name: Upload AnyKernel3
         uses: actions/upload-artifact@v4
         with:
-          name: AnyKernel3_${{ github.event.inputs.ksu_type == 'sukisu' && 'SukiSU' || 'KSUNext' }}_${{ env.KSUVER }}_6.6.66${{ steps.suffix.outputs.value }}
+          name: AnyKernel3_${{ github.event.inputs.ksu_type == 'sukisu' && 'SukiSU' || 'KSUNext' }}_${{ env.KSUVER }}_6.6.66
           path: kernel_workspace/AnyKernel3/*
