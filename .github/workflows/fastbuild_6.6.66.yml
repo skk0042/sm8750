@@ -585,77 +585,13 @@ jobs:
           
       - name: 构建内核
         run: |
-          WORKDIR="$(pwd)"
-          export PATH="/usr/lib/ccache:$PATH"
-          export PATH="$WORKDIR/kernel_workspace/clang18/bin:$PATH"
-          export PATH="$WORKDIR/kernel_workspace/build-tools/bin:$PATH"
-          CLANG_DIR="$WORKDIR/kernel_workspace/clang18/bin"
-          CLANG_VERSION="$($CLANG_DIR/clang --version | head -n 1)"
-          LLD_VERSION="$($CLANG_DIR/ld.lld --version | head -n 1)"
-          echo "编译器信息:"
-          echo "Clang版本: $CLANG_VERSION"
-          echo "LLD版本: $LLD_VERSION"
-          pahole_version=$(pahole --version 2>/dev/null | head -n1); [ -z "$pahole_version" ] && echo "pahole版本：未安装" || echo "pahole版本：$pahole_version"
-          
-          export CCACHE_LOGFILE="${{ github.workspace }}/kernel_workspace/ccache.log"
-          export CCACHE_COMPILERCHECK="none"
-          export CCACHE_BASEDIR="${{ github.workspace }}"
-          export CCACHE_NOHASHDIR="true"
-          export CCACHE_HARDLINK="true"
-          export CCACHE_DIR="${{ env.CCACHE_DIR }}"
-          export CCACHE_MAXSIZE="3G"
-          echo "sloppiness = file_stat_matches,include_file_ctime,include_file_mtime,pch_defines,file_macro,time_macros" >> "$CCACHE_DIR/ccache.conf"
-          
           cd kernel_workspace/common
           
-          # 设置固定的构建时间环境变量
-          export KBUILD_BUILD_TIMESTAMP="7月1日，周二19:48:18 UTC 2025"
-          export KBUILD_BUILD_USER="github-actions"
-          export KBUILD_BUILD_HOST="builder"
-          
-          # 在构建内核的同时清除不必要的.NET, Android NDK, Haskell, CodeQL运行库，清理空间且不阻塞后续步骤运行
-          sudo rm -rf /usr/share/dotnet &
-          sudo rm -rf /usr/local/lib/android &
-          sudo rm -rf /opt/ghc &
-          sudo rm -rf /opt/hostedtoolcache/CodeQL &
-          
-          # 直接使用标准编译器路径，不使用任何包装脚本
-          echo "--- 开始构建内核 ---"
-          echo "使用编译器: $CLANG_DIR/clang"
-          echo "使用链接器: $CLANG_DIR/ld.lld"
-          echo "构建时间: $KBUILD_BUILD_TIMESTAMP"
-          
-          # 配置阶段
-          make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- \
-            CC="ccache $CLANG_DIR/clang" \
-            LD="$CLANG_DIR/ld.lld" \
-            HOSTCC="$CLANG_DIR/clang" \
-            HOSTLD="$CLANG_DIR/ld.lld" \
-            O=out \
-            KCFLAGS+=-O2 \
-            KCFLAGS+=-Wno-error \
-            KCFLAGS+=-mcpu=generic \
-            KBUILD_BUILD_TIMESTAMP="$KBUILD_BUILD_TIMESTAMP" \
-            gki_defconfig
-          
-          # 编译阶段
-          make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- \
-            CC="ccache $CLANG_DIR/clang" \
-            LD="$CLANG_DIR/ld.lld" \
-            HOSTCC="$CLANG_DIR/clang" \
-            HOSTLD="$CLANG_DIR/ld.lld" \
-            O=out \
-            KCFLAGS+=-O2 \
-            KCFLAGS+=-Wno-error \
-            KCFLAGS+=-mcpu=generic \
-            KBUILD_BUILD_TIMESTAMP="$KBUILD_BUILD_TIMESTAMP" \
-            Image
+          # 最简化构建命令
+          make -j$(nproc --all) LLVM=1 ARCH=arm64 O=out gki_defconfig
+          make -j$(nproc --all) LLVM=1 ARCH=arm64 O=out Image
           
           echo "内核编译完成！"
-          echo "ccache状态："
-          ccache -s
-          echo "编译后空间:"
-          df -h
           
       - name: Make AnyKernel3
         run: |
