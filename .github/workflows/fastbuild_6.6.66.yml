@@ -562,7 +562,27 @@ jobs:
           
           # 设置环境变量（如果内核构建系统需要）
           echo "KBUILD_BUILD_TIMESTAMP=${DATESTR}" >> ./common/arch/arm64/configs/gki_defconfig     
-                
+     
+      - name: 修复 CPU 架构问题
+        run: |
+          cd kernel_workspace/common
+          # 确保使用通用的 CPU 架构
+          echo "CONFIG_ARM64_CPU_FEATURES_GENERIC=y" >> ./arch/arm64/configs/gki_defconfig
+          # 移除任何可能导致特定 CPU 架构的配置
+          sed -i '/oryon/d' ./arch/arm64/configs/gki_defconfig 2>/dev/null || true
+          
+          # 检查构建配置中是否有硬编码的 CPU 参数
+          if [ -f "./build.config.gki" ]; then
+            sed -i 's/-mcpu=oryon-1/-mcpu=generic/g' ./build.config.gki || true
+          fi
+          
+          # 检查其他可能的配置文件
+          find . -name "*.mk" -o -name "Makefile*" -o -name "Kconfig*" | xargs grep -l "oryon-1" 2>/dev/null | while read file; do
+            echo "修复文件: $file"
+            sed -i 's/-mcpu=oryon-1/-mcpu=generic/g' "$file" || true
+            sed -i 's/oryon-1/generic/g' "$file" || true
+          done
+          
       - name: 构建内核
         run: |
           WORKDIR="$(pwd)"
@@ -596,12 +616,15 @@ jobs:
           echo "FAKETIME=$FAKETIME" >> $GITHUB_ENV
           SO_DIR=$(pwd)
           export PRELOAD_LIBS="$SO_DIR/libfakestat.so $SO_DIR/libfaketimeMT.so"
+          
           #创建 CC (编译器) 包装器
           echo '#!/bin/bash' > cc-wrapper
           echo 'export LD_PRELOAD="'$PRELOAD_LIBS'"' >> cc-wrapper
           echo 'export FAKESTAT="'$FAKESTAT'"' >> cc-wrapper
           echo 'export FAKETIME="'$FAKETIME'"' >> cc-wrapper
-          echo 'ccache clang "$@"' >> cc-wrapper
+          # 添加 -mcpu=generic 来覆盖不支持的 oryon-1
+          echo 'ccache clang -mcpu=generic "$@"' >> cc-wrapper
+          
           #创建 LD (链接器) 包装器
           echo '#!/bin/bash' > ld-wrapper
           echo 'export LD_PRELOAD="'$PRELOAD_LIBS'"' >> ld-wrapper
@@ -633,8 +656,8 @@ jobs:
           sudo rm -rf /usr/local/lib/android &
           sudo rm -rf /opt/ghc &
           sudo rm -rf /opt/hostedtoolcache/CodeQL &
-          make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" LD="ld.lld" HOSTLD=ld.lld O=out KCFLAGS+=-O2 KCFLAGS+=-Wno-error gki_defconfig &&
-          make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="$(pwd)/cc-wrapper" LD="$(pwd)/ld-wrapper" HOSTLD=ld.lld O=out KCFLAGS+=-O2 KCFLAGS+=-Wno-error Image
+          make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" LD="ld.lld" HOSTLD=ld.lld O=out KCFLAGS+=-O2 KCFLAGS+=-Wno-error KCFLAGS+=-mcpu=generic gki_defconfig &&
+          make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="$(pwd)/cc-wrapper" LD="$(pwd)/ld-wrapper" HOSTLD=ld.lld O=out KCFLAGS+=-O2 KCFLAGS+=-Wno-error KCFLAGS+=-mcpu=generic Image
           
           # 编译后时间劫持二次校验
           echo "--- 编译后环境时间: $(LD_PRELOAD=$PRELOAD_LIBS date) ---"
@@ -645,7 +668,7 @@ jobs:
           ccache -s
           echo "编译后空间:"
           df -h
-         
+          
       - name: Make AnyKernel3
         run: |
           cd kernel_workspace
