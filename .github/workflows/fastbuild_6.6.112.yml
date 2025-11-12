@@ -130,7 +130,12 @@ jobs:
             sed -i 's/ -dirty//g' "$f"
             sed -i '$i res=$(echo "$res" | sed '\''s/-dirty//g'\'')' "$f"
           done
-
+      - name: 修正编译参数
+        run: |
+         cd common
+         echo "🔧 修正内核 Makefile 中不支持的 -mcpu=oryon-1 参数..."
+         sed -i 's/-mcpu=oryon-1/-mcpu=cortex-x4/g' arch/arm64/Makefile || true
+         
       - name: 配置ccache目录
         run: |
           echo "CCACHE_DIR=$HOME/.ccache_6.6.66" >> $GITHUB_ENV
