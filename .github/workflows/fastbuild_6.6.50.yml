@@ -619,7 +619,7 @@ jobs:
           echo "编译后空间:"
           df -h
                    
-        - name: Make AnyKernel3
+      - name: Make AnyKernel3
         run: |
           cd kernel_workspace
           git clone https://github.com/skk0042/AnyKernel3 --depth=1
