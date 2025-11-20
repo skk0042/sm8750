@@ -1,10 +1,13 @@
 name: 一加Ace5系列 统一内核构建流程
 env:
   TZ: Asia/Shanghai
-  CCACHE_MAXSIZE: '5G'
+  CCACHE_MAXSIZE: '3G'
   ANYKERNEL_REPO: 'https://github.com/cctv18/AnyKernel3'
+  # 恢复你原文件的BUILD_TOOLS_REPO链接
   BUILD_TOOLS_REPO: 'https://github.com/cctv18/oneplus_sm8650_toolchain/releases/download/LLVM-Clang18-r510928/build-tools.zip'
+  # 恢复你原文件的CLANG18_REPO链接
   CLANG18_REPO: 'https://github.com/cctv18/oneplus_sm8650_toolchain/releases/download/LLVM-Clang18-r510928/clang-r510928.zip'
+
 on:
   workflow_dispatch:
     inputs:
@@ -41,23 +44,25 @@ jobs:
     steps:
      - name: 初始化环境变量（区分Android版本）
        run: |
-        # 根据内核版本设置源码地址、内核名称和Android版本
         case "${{ github.event.inputs.kernel_version }}" in
         6.1.118)
+        # 恢复你原文件的6.1.118源码链接
         echo "SRC_REPO=https://github.com/cctv18/android_kernel_common_oneplus_sm8650/archive/refs/heads/oneplus/sm8650_v_15.0.0_oneplus12_6.1.118.zip" >> $GITHUB_ENV
         echo "KERNEL_NAME=oneplus_ace5_standard" >> $GITHUB_ENV
         echo "CCACHE_DIR=$HOME/.ccache_${{ github.event.inputs.kernel_version }}" >> $GITHUB_ENV
         echo "ANDROID_VERSION=android14" >> $GITHUB_ENV
-        echo "SUSFS_COMMIT=a162e2469d0b472545e5e46457eee171c0975fb0" >> $GITHUB_ENV  # 移除多余空格
+        echo "SUSFS_COMMIT=a162e2469d0b472545e5e46457eee171c0975fb0" >> $GITHUB_ENV
         ;;
         6.1.115)
+        # 恢复你原文件的6.1.115源码链接
         echo "SRC_REPO=https://github.com/cctv18/android_kernel_common_oneplus_sm8650/archive/refs/heads/oneplus/sm8650_v_15.0.0_oneplus12_6.1.115.zip" >> $GITHUB_ENV
         echo "KERNEL_NAME=oneplus_ace5_racing" >> $GITHUB_ENV
         echo "CCACHE_DIR=$HOME/.ccache_${{ github.event.inputs.kernel_version }}" >> $GITHUB_ENV
         echo "ANDROID_VERSION=android14" >> $GITHUB_ENV
-        echo "SUSFS_COMMIT=a162e2469d0b472545e5e46457eee171c0975fb0" >> $GITHUB_ENV  # 移除多余空格
+        echo "SUSFS_COMMIT=a162e2469d0b472545e5e46457eee171c0975fb0" >> $GITHUB_ENV
         ;;
         6.6.50)
+        # 恢复你原文件的6.6.50源码链接
         echo "SRC_REPO=https://github.com/cctv18/android_kernel_oneplus_mt6991/archive/refs/heads/oneplus/mt6991_v_15.0.2_ace5_ultra.zip" >> $GITHUB_ENV
         echo "KERNEL_NAME=oneplus_ace5_ultra" >> $GITHUB_ENV
         echo "CCACHE_DIR=$HOME/.ccache_${{ github.event.inputs.kernel_version }}" >> $GITHUB_ENV
@@ -65,6 +70,7 @@ jobs:
         echo "SUSFS_COMMIT=f450ec00bf592d080f59b01ff6f9242456c9a427" >> $GITHUB_ENV
         ;;
         6.6.89)
+        # 恢复你原文件的6.6.89源码链接
         echo "SRC_REPO=https://github.com/cctv18/android_kernel_common_oneplus_sm8750/archive/refs/heads/oneplus/sm8750_v_16.0.0_oneplus_13_6.6.89.zip" >> $GITHUB_ENV
         echo "KERNEL_NAME=oneplus_ace5_pro" >> $GITHUB_ENV
         echo "CCACHE_DIR=$HOME/.ccache_${{ github.event.inputs.kernel_version }}" >> $GITHUB_ENV
@@ -72,9 +78,8 @@ jobs:
         echo "SUSFS_COMMIT=f450ec00bf592d080f59b01ff6f9242456c9a427" >> $GITHUB_ENV
         ;;
         esac
-        # 修复：用shell变量而非env引用，避免赋值时机问题
         KERNEL_NAME=$(grep -oP 'KERNEL_NAME=\K.*' $GITHUB_ENV)
-        echo "固定版本后缀：$KERNEL_NAME"  # 仅日志输出，无需写入env（原错误根源）
+        echo "固定版本后缀：$KERNEL_NAME"
 
 
      - name: 安装依赖+初始化工具链
