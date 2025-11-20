@@ -1,8 +1,10 @@
 name: 一加Ace5系列 统一内核构建流程
 env:
   TZ: Asia/Shanghai
-  CCACHE_MAXSIZE: '5G'
+  CCACHE_MAXSIZE: '3G'
+  # 保持你原文件的AnyKernel3链接
   ANYKERNEL_REPO: 'https://github.com/cctv18/AnyKernel3'
+  # 保持你原文件的工具链链接（你原文件可下载）
   BUILD_TOOLS_REPO: 'https://github.com/cctv18/oneplus_sm8650_toolchain/releases/download/LLVM-Clang18-r510928/build-tools.zip'
   CLANG18_REPO: 'https://github.com/cctv18/oneplus_sm8650_toolchain/releases/download/LLVM-Clang18-r510928/clang-r510928.zip'
 on:
@@ -53,13 +55,13 @@ on:
         required: true
         type: boolean
         default: 'false'
-
 jobs:
   build:
     runs-on: ubuntu-latest
     outputs:
       ksuver: ${{ steps.ksu_version.outputs.ksuver }}
     steps:
+      # 保持你原文件的环境变量逻辑（SRC_REPO完全和你原文件一致）
       - name: 初始化环境变量（区分Android版本）
         run: |
           case "${{ github.event.inputs.kernel_version }}" in
@@ -85,7 +87,7 @@ jobs:
               echo "SUSFS_COMMIT=f450ec00bf592d080f59b01ff6f9242456c9a427" >> $GITHUB_ENV
               ;;
             6.6.89)
-              # 修正URL：空格替换为下划线，与其他版本格式一致
+              # 完全保持你原文件的6.6.89 SRC_REPO（你原文件可下载）
               echo "SRC_REPO=https://github.com/cctv18/android_kernel_common_oneplus_sm8750/archive/refs/heads/oneplus/sm8750_v_16.0.0_oneplus_13_6.6.89.zip" >> $GITHUB_ENV
               echo "KERNEL_NAME=oneplus_ace5_pro" >> $GITHUB_ENV
               echo "CCACHE_DIR=$HOME/.ccache_${{ github.event.inputs.kernel_version }}" >> $GITHUB_ENV
@@ -96,6 +98,7 @@ jobs:
           KERNEL_NAME=$(grep -oP 'KERNEL_NAME=\K.*' $GITHUB_ENV)
           echo "固定版本后缀：$KERNEL_NAME"
 
+      # 保持你原文件的依赖/工具链初始化逻辑
       - name: 安装依赖+初始化工具链
         run: |
           rm -rf kernel_workspace && mkdir kernel_workspace && cd kernel_workspace
@@ -116,6 +119,7 @@ jobs:
           sed -i 's/ -dirty//g' common/scripts/setlocalversion
           sed -i '$i res=$(echo "$res" | sed '\''s/-dirty//g'\'')' common/scripts/setlocalversion
 
+      # 保持你原文件的ccache逻辑
       - name: 配置ccache缓存
         uses: actions/cache@v4
         id: ccache-restore
@@ -133,6 +137,7 @@ jobs:
           echo "sloppiness = file_stat_matches,include_file_ctime,include_file_mtime,pch_defines,file_macro,time_macros" >> ${{ env.CCACHE_DIR }}/ccache.conf
           ccache -s
 
+      # 保持你原文件的KernelSU添加逻辑
       - name: 添加KernelSU
         id: ksu_version
         run: |
@@ -171,12 +176,14 @@ jobs:
           echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV
           echo "ksuver=$KSU_VERSION" >> $GITHUB_OUTPUT
 
+      # 修复：添加你原文件的|| true逻辑（补丁允许偏移成功）
       - name: 应用KernelSU & SUSFS补丁
         run: |
           cd kernel_workspace
           KERNEL_VER=${{ github.event.inputs.kernel_version }}
           ANDROID_VER=${{ env.ANDROID_VERSION }}
           KSU_TYPE=${{ github.event.inputs.ksu_type }}
+          # 保持你原文件的分支名逻辑（取主+次版本）
           KERNEL_MAIN_VER=$(echo ${KERNEL_VER} | awk -F '.' '{print $1"."$2}')
           SUSFS_COMMIT=${{ env.SUSFS_COMMIT }}
           
@@ -186,6 +193,7 @@ jobs:
             cp susfs4ksu/kernel_patches/50_add_susfs_in_gki-${ANDROID_VER}-${KERNEL_MAIN_VER}.patch common/
             cp susfs4ksu/kernel_patches/fs/* common/fs/ && cp susfs4ksu/kernel_patches/include/linux/* common/include/linux/
             cp SukiSU_patch/69_hide_stuff.patch common/
+            # 你原文件的|| true逻辑
             cd common && patch -p1 < 50_add_susfs_in_gki-${ANDROID_VER}-${KERNEL_MAIN_VER}.patch || true
           else
             git clone https://gitlab.com/simonpunk/susfs4ksu.git -b gki-${ANDROID_VER}-${KERNEL_MAIN_VER}
@@ -197,7 +205,9 @@ jobs:
             cp susfs4ksu/kernel_patches/fs/* common/fs/ && cp susfs4ksu/kernel_patches/include/linux/* common/include/linux/
             [[ $KSU_TYPE == "ksunext" ]] && cp kernel_patches/next/scope_min_manual_hooks_v1.5.patch common/
             cp $([[ $KSU_TYPE == "ksunext" ]] && "kernel_patches/69_hide_stuff.patch" || "SukiSU_patch/69_hide_stuff.patch") common/
+            # 你原文件的|| true逻辑
             cd common && patch -p1 < 50_add_susfs_in_gki-${ANDROID_VER}-${KERNEL_MAIN_VER}.patch || true
+            # 你原文件的|| true逻辑
             [[ $KSU_TYPE == "ksunext" ]] && patch -p1 -N -F 3 < scope_min_manual_hooks_v1.5.patch || true
           fi
           
@@ -205,6 +215,7 @@ jobs:
             sed -i 's|vma = find_vma(mm|struct vm_area_struct *&|' fs/proc/task_mmu.c
           fi
           
+          # 你原文件的|| true逻辑
           patch -p1 < 69_hide_stuff.patch || true
           
           if [[ $KSU_TYPE == "mksu" || $KSU_TYPE == "ksu" ]]; then
@@ -216,6 +227,7 @@ jobs:
           
           [[ $KSU_TYPE == "ksunext" ]] && (cd drivers/kernelsu && wget https://github.com/WildKernels/kernel_patches/raw/refs/heads/main/next/susfs_fix_patches/v1.5.12/fix_apk_sign.c.patch && patch -p2 -N -F 3 < fix_apk_sign.c.patch || true)
 
+      # 保持你原文件的lz4补丁逻辑
       - name: 应用lz4补丁
         run: |
           cd kernel_workspace
@@ -240,6 +252,7 @@ jobs:
             cp ../SukiSU_patch/other/zram/zram_patch/${KERNEL_VER%%.*}/lz4kd.patch . && patch -p1 -F 3 < lz4kd.patch || true
           }
 
+      # 保持你原文件的内核配置逻辑
       - name: 内核配置
         run: |
           cd kernel_workspace/common
@@ -279,6 +292,7 @@ jobs:
           
           echo "CONFIG_BBG=y" >> arch/arm64/configs/gki_defconfig
 
+      # 保持你原文件的基带保护逻辑
       - name: 启用内核级基带保护
         run: |
           echo "正在启用内核级基带保护支持…"
@@ -309,6 +323,7 @@ jobs:
           sed -i 's/hooks.o //g' "./selinux/Makefile"
           cat "./baseband-guard/sepatch.txt" >> "./selinux/Makefile"
 
+      # 保持你原文件的调度器逻辑
       - name: 启用调度器（仅6.6内核支持ADIOS）
         run: |
           cd kernel_workspace
@@ -326,6 +341,7 @@ jobs:
             echo "CONFIG_REKERNEL=y" >> common/arch/arm64/configs/gki_defconfig
           fi
 
+      # 保持你原文件的制作名称逻辑
       - name: 添加制作名称（对应内核版本）
         run: |
           cd kernel_workspace
@@ -339,6 +355,7 @@ jobs:
           sed -i 's/${scm_version}//' ./common/scripts/setlocalversion
           echo "CONFIG_LOCALVERSION_AUTO=n" >> ./common/arch/arm64/configs/gki_defconfig
 
+      # 保持你原文件的构建逻辑
       - name: 构建内核
         run: |
           cd kernel_workspace/common
@@ -363,6 +380,7 @@ jobs:
               
           ccache -s
 
+      # 保持你原文件的AnyKernel3逻辑
       - name: 配置AnyKernel3并生成刷机包
         run: |
           cd kernel_workspace
@@ -380,6 +398,7 @@ jobs:
           
           echo "ZIP_NAME=$ZIP_NAME" >> $GITHUB_ENV
 
+      # 保持你原文件的上传逻辑
       - name: 上传内核刷机包
         uses: actions/upload-artifact@v4
         with:
