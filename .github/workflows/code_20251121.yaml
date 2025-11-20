@@ -227,53 +227,53 @@ jobs:
       # 修复：添加你原文件的|| true逻辑（补丁允许偏移成功）
       - name: 应用KernelSU & SUSFS补丁
         run: |
-          cd kernel_workspace
-          KERNEL_VER=${{ github.event.inputs.kernel_version }}
-          ANDROID_VER=${{ env.ANDROID_VERSION }}
-          KSU_TYPE=${{ github.event.inputs.ksu_type }}
-          # 保持你原文件的分支名逻辑（取主+次版本）
-          KERNEL_MAIN_VER=$(echo ${KERNEL_VER} | awk -F '.' '{print $1"."$2}')
-          SUSFS_COMMIT=${{ env.SUSFS_COMMIT }}
+         cd kernel_workspace
+         KERNEL_VER=${{ github.event.inputs.kernel_version }}
+         ANDROID_VER=${{ env.ANDROID_VERSION }}
+         KSU_TYPE=${{ github.event.inputs.ksu_type }}
+         KERNEL_MAIN_VER=$(echo ${KERNEL_VER} | awk -F '.' '{print $1"."$2}')
+         SUSFS_COMMIT=${{ env.SUSFS_COMMIT }}
           
-          if [[ $KSU_TYPE == "sukisu" ]]; then
-            git clone https://github.com/ShirkNeko/susfs4ksu.git -b gki-${ANDROID_VER}-${KERNEL_MAIN_VER}
-            git clone https://github.com/ShirkNeko/SukiSU_patch.git
-            cp susfs4ksu/kernel_patches/50_add_susfs_in_gki-${ANDROID_VER}-${KERNEL_MAIN_VER}.patch common/
-            cp susfs4ksu/kernel_patches/fs/* common/fs/ && cp susfs4ksu/kernel_patches/include/linux/* common/include/linux/
-            cp SukiSU_patch/69_hide_stuff.patch common/
-            # 你原文件的|| true逻辑
-            cd common && patch -p1 < 50_add_susfs_in_gki-${ANDROID_VER}-${KERNEL_MAIN_VER}.patch || true
-          else
-            git clone https://gitlab.com/simonpunk/susfs4ksu.git -b gki-${ANDROID_VER}-${KERNEL_MAIN_VER}
-            if [[ $KSU_TYPE == "ksunext" ]]; then
-              cd susfs4ksu && git checkout $SUSFS_COMMIT && cd ..
-            fi
-            git clone $([[ $KSU_TYPE == "ksunext" ]] && echo "https://github.com/WildKernels/kernel_patches.git" || "https://github.com/ShirkNeko/SukiSU_patch.git")
-            cp susfs4ksu/kernel_patches/50_add_susfs_in_gki-${ANDROID_VER}-${KERNEL_MAIN_VER}.patch common/
-            cp susfs4ksu/kernel_patches/fs/* common/fs/ && cp susfs4ksu/kernel_patches/include/linux/* common/include/linux/
-            [[ $KSU_TYPE == "ksunext" ]] && cp kernel_patches/next/scope_min_manual_hooks_v1.5.patch common/
-            cp $([[ $KSU_TYPE == "ksunext" ]] && "kernel_patches/69_hide_stuff.patch" || "SukiSU_patch/69_hide_stuff.patch") common/
-            # 你原文件的|| true逻辑
-            cd common && patch -p1 < 50_add_susfs_in_gki-${ANDROID_VER}-${KERNEL_MAIN_VER}.patch || true
-            # 你原文件的|| true逻辑
-            [[ $KSU_TYPE == "ksunext" ]] && patch -p1 -N -F 3 < scope_min_manual_hooks_v1.5.patch || true
+         if [[ $KSU_TYPE == "sukisu" ]]; then
+         git clone https://github.com/ShirkNeko/susfs4ksu.git -b gki-${ANDROID_VER}-${KERNEL_MAIN_VER}
+         git clone https://github.com/ShirkNeko/SukiSU_patch.git
+         cp susfs4ksu/kernel_patches/50_add_susfs_in_gki-${ANDROID_VER}-${KERNEL_MAIN_VER}.patch common/
+         cp susfs4ksu/kernel_patches/fs/* common/fs/ && cp susfs4ksu/kernel_patches/include/linux/* common/include/linux/
+         cp SukiSU_patch/69_hide_stuff.patch common/
+         # 强制加 || true
+         cd common && patch -p1 < 50_add_susfs_in_gki-${ANDROID_VER}-${KERNEL_MAIN_VER}.patch || true
+         else
+         git clone https://gitlab.com/simonpunk/susfs4ksu.git -b gki-${ANDROID_VER}-${KERNEL_MAIN_VER}
+          if [[ $KSU_TYPE == "ksunext" ]]; then
+          cd susfs4ksu && git checkout $SUSFS_COMMIT && cd ..
           fi
+         git clone $([[ $KSU_TYPE == "ksunext" ]] && echo "https://github.com/WildKernels/kernel_patches.git" || "https://github.com/ShirkNeko/SukiSU_patch.git")
+         cp susfs4ksu/kernel_patches/50_add_susfs_in_gki-${ANDROID_VER}-${KERNEL_MAIN_VER}.patch common/
+         cp susfs4ksu/kernel_patches/fs/* common/fs/ && cp susfs4ksu/kernel_patches/include/linux/* common/include/linux/
+         [[ $KSU_TYPE == "ksunext" ]] && cp kernel_patches/next/scope_min_manual_hooks_v1.5.patch common/
+         cp $([[ $KSU_TYPE == "ksunext" ]] && "kernel_patches/69_hide_stuff.patch" || "SukiSU_patch/69_hide_stuff.patch") common/
+         # 强制加 || true
+         cd common && patch -p1 < 50_add_susfs_in_gki-${ANDROID_VER}-${KERNEL_MAIN_VER}.patch || true
+         # 强制加 || true
+         [[ $KSU_TYPE == "ksunext" ]] && patch -p1 -N -F 3 < scope_min_manual_hooks_v1.5.patch || true
+         fi
           
-          if [[ $KERNEL_VER == "6.6.50" ]]; then
-            sed -i 's|vma = find_vma(mm|struct vm_area_struct *&|' fs/proc/task_mmu.c
-          fi
-          
-          # 你原文件的|| true逻辑
-          patch -p1 < 69_hide_stuff.patch || true
-          
-          if [[ $KSU_TYPE == "mksu" || $KSU_TYPE == "ksu" ]]; then
-            cd ../KernelSU
-            cp ../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch . && patch -p1 < 10_enable_susfs_for_ksu.patch || true
-            wget https://github.com/cctv18/oppo_oplus_realme_sm8750/raw/refs/heads/main/other_patch/fix_umount.patch && patch -p1 < fix_umount.patch || true
-            [[ $KSU_TYPE == "mksu" ]] && wget https://github.com/cctv18/oppo_oplus_realme_sm8750/raw/refs/heads/main/other_patch/mksu_supercalls.patch && patch -p1 < mksu_supercalls.patch || true
-          fi
-          
-          [[ $KSU_TYPE == "ksunext" ]] && (cd drivers/kernelsu && wget https://github.com/WildKernels/kernel_patches/raw/refs/heads/main/next/susfs_fix_patches/v1.5.12/fix_apk_sign.c.patch && patch -p2 -N -F 3 < fix_apk_sign.c.patch || true)
+         if [[ $KERNEL_VER == "6.6.50" ]]; then
+         sed -i 's|vma = find_vma(mm|struct vm_area_struct *&|' fs/proc/task_mmu.c
+         fi
+         
+         # 强制加 || true
+         patch -p1 < 69_hide_stuff.patch || true
+         
+         if [[ $KSU_TYPE == "mksu" || $KSU_TYPE == "ksu" ]]; then
+         cd ../KernelSU
+         cp ../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch . && patch -p1 < 10_enable_susfs_for_ksu.patch || true
+         # 强制加 || true
+         wget https://github.com/cctv18/oppo_oplus_realme_sm8750/raw/refs/heads/main/other_patch/fix_umount.patch && patch -p1 < fix_umount.patch || true
+          # 强制加 || true
+         [[ $KSU_TYPE == "mksu" ]] && wget https://github.com/cctv18/oppo_oplus_realme_sm8750/raw/refs/heads/main/other_patch/mksu_supercalls.patch && patch -p1 < mksu_supercalls.patch || true
+         fi
+         [[ $KSU_TYPE == "ksunext" ]] && (cd drivers/kernelsu && wget https://github.com/WildKernels/kernel_patches/raw/refs/heads/main/next/susfs_fix_patches/v1.5.12/fix_apk_sign.c.patch && patch -p2 -N -F 3 < fix_apk_sign.c.patch || true)
 
       # 保持你原文件的lz4补丁逻辑
       - name: 应用lz4补丁
