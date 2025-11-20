@@ -39,43 +39,46 @@ jobs:
     outputs:
       ksuver: ${{ steps.ksu_version.outputs.ksuver }}
     steps:
-      - name: 初始化环境变量（区分Android版本）
-        run: |
-          # 根据内核版本设置源码地址、内核名称和Android版本
-          case "${{ github.event.inputs.kernel_version }}" in
-            6.1.118)
-              echo "SRC_REPO=https://github.com/cctv18/android_kernel_common_oneplus_sm8650/archive/refs/heads/oneplus/sm8650_v_15.0.0_oneplus12_6.1.118.zip" >> $GITHUB_ENV
-              echo "KERNEL_NAME=oneplus_ace5_standard" >> $GITHUB_ENV
-              echo "CCACHE_DIR=$HOME/.ccache_${{ github.event.inputs.kernel_version }}" >> $GITHUB_ENV
-              echo "ANDROID_VERSION=android14" >> $GITHUB_ENV
-              echo "SUSFS_COMMIT= a162e2469d0b472545e5e46457eee171c0975fb0" >> $GITHUB_ENV
-              ;;
-            6.1.115)
-              echo "SRC_REPO=https://github.com/cctv18/android_kernel_common_oneplus_sm8650/archive/refs/heads/oneplus/sm8650_v_15.0.0_oneplus12_6.1.115.zip" >> $GITHUB_ENV
-              echo "KERNEL_NAME=oneplus_ace5_racing" >> $GITHUB_ENV
-              echo "CCACHE_DIR=$HOME/.ccache_${{ github.event.inputs.kernel_version }}" >> $GITHUB_ENV
-              echo "ANDROID_VERSION=android14" >> $GITHUB_ENV
-              echo "SUSFS_COMMIT= a162e2469d0b472545e5e46457eee171c0975fb0" >> $GITHUB_ENV
-              ;;
-            6.6.50)
-              echo "SRC_REPO=https://github.com/cctv18/android_kernel_oneplus_mt6991/archive/refs/heads/oneplus/mt6991_v_15.0.2_ace5_ultra.zip" >> $GITHUB_ENV
-              echo "KERNEL_NAME=oneplus_ace5_ultra" >> $GITHUB_ENV
-              echo "CCACHE_DIR=$HOME/.ccache_${{ github.event.inputs.kernel_version }}" >> $GITHUB_ENV
-              echo "ANDROID_VERSION=android15" >> $GITHUB_ENV
-              echo "SUSFS_COMMIT=f450ec00bf592d080f59b01ff6f9242456c9a427" >> $GITHUB_ENV
-              ;;
-            6.6.89)
-              echo "SRC_REPO=https://github.com/cctv18/android_kernel_common_oneplus_sm8750/archive/refs/heads/oneplus/sm8750_v_16.0.0_oneplus_13_6.6.89.zip" >> $GITHUB_ENV
-              echo "KERNEL_NAME=oneplus_ace5_pro" >> $GITHUB_ENV
-              echo "CCACHE_DIR=$HOME/.ccache_${{ github.event.inputs.kernel_version }}" >> $GITHUB_ENV
-              echo "ANDROID_VERSION=android15" >> $GITHUB_ENV
-              echo "SUSFS_COMMIT=f450ec00bf592d080f59b01ff6f9242456c9a427" >> $GITHUB_ENV
-              ;;
-          esac
-          echo "固定版本后缀：${{ env.KERNEL_NAME }}" >> $GITHUB_ENV
+     - name: 初始化环境变量（区分Android版本）
+       run: |
+        # 根据内核版本设置源码地址、内核名称和Android版本
+        case "${{ github.event.inputs.kernel_version }}" in
+        6.1.118)
+        echo "SRC_REPO=https://github.com/cctv18/android_kernel_common_oneplus_sm8650/archive/refs/heads/oneplus/sm8650_v_15.0.0_oneplus12_6.1.118.zip" >> $GITHUB_ENV
+        echo "KERNEL_NAME=oneplus_ace5_standard" >> $GITHUB_ENV
+        echo "CCACHE_DIR=$HOME/.ccache_${{ github.event.inputs.kernel_version }}" >> $GITHUB_ENV
+        echo "ANDROID_VERSION=android14" >> $GITHUB_ENV
+        echo "SUSFS_COMMIT=a162e2469d0b472545e5e46457eee171c0975fb0" >> $GITHUB_ENV  # 移除多余空格
+        ;;
+        6.1.115)
+        echo "SRC_REPO=https://github.com/cctv18/android_kernel_common_oneplus_sm8650/archive/refs/heads/oneplus/sm8650_v_15.0.0_oneplus12_6.1.115.zip" >> $GITHUB_ENV
+        echo "KERNEL_NAME=oneplus_ace5_racing" >> $GITHUB_ENV
+        echo "CCACHE_DIR=$HOME/.ccache_${{ github.event.inputs.kernel_version }}" >> $GITHUB_ENV
+        echo "ANDROID_VERSION=android14" >> $GITHUB_ENV
+        echo "SUSFS_COMMIT=a162e2469d0b472545e5e46457eee171c0975fb0" >> $GITHUB_ENV  # 移除多余空格
+        ;;
+        6.6.50)
+        echo "SRC_REPO=https://github.com/cctv18/android_kernel_oneplus_mt6991/archive/refs/heads/oneplus/mt6991_v_15.0.2_ace5_ultra.zip" >> $GITHUB_ENV
+        echo "KERNEL_NAME=oneplus_ace5_ultra" >> $GITHUB_ENV
+        echo "CCACHE_DIR=$HOME/.ccache_${{ github.event.inputs.kernel_version }}" >> $GITHUB_ENV
+        echo "ANDROID_VERSION=android15" >> $GITHUB_ENV
+        echo "SUSFS_COMMIT=f450ec00bf592d080f59b01ff6f9242456c9a427" >> $GITHUB_ENV
+        ;;
+        6.6.89)
+        echo "SRC_REPO=https://github.com/cctv18/android_kernel_common_oneplus_sm8750/archive/refs/heads/oneplus/sm8750_v_16.0.0_oneplus_13_6.6.89.zip" >> $GITHUB_ENV
+        echo "KERNEL_NAME=oneplus_ace5_pro" >> $GITHUB_ENV
+        echo "CCACHE_DIR=$HOME/.ccache_${{ github.event.inputs.kernel_version }}" >> $GITHUB_ENV
+        echo "ANDROID_VERSION=android15" >> $GITHUB_ENV
+        echo "SUSFS_COMMIT=f450ec00bf592d080f59b01ff6f9242456c9a427" >> $GITHUB_ENV
+        ;;
+        esac
+        # 修复：用shell变量而非env引用，避免赋值时机问题
+        KERNEL_NAME=$(grep -oP 'KERNEL_NAME=\K.*' $GITHUB_ENV)
+        echo "固定版本后缀：$KERNEL_NAME"  # 仅日志输出，无需写入env（原错误根源）
 
-      - name: 安装依赖+初始化工具链
-        run: |
+
+     - name: 安装依赖+初始化工具链
+       run: |
           rm -rf kernel_workspace && mkdir kernel_workspace && cd kernel_workspace
           
           # 精简依赖安装
@@ -347,7 +350,7 @@ jobs:
           wget https://github.com/cctv18/oppo_oplus_realme_sm8750/raw/refs/heads/main/lib/libfaketimeMT.so
           chmod 777 ./*.so
           export FAKESTAT="2025-05-25 12:00:00"
-          export FAKETIME="@2025-05-25 13:00:00"
+          export FAKETIME="@2025-05-25 12:00:00"
           export PRELOAD_LIBS="$PWD/libfakestat.so $PWD/libfaketimeMT.so"
           
           # 创建编译器/链接器包装器
