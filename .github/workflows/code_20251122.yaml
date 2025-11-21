@@ -472,5 +472,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: AK3_${{ github.event.inputs.ksu_type == 'sukisu' && 'SukiSUUltra' || github.event.inputs.ksu_type == 'ksunext' && 'KernelSUNext' || github.event.inputs.ksu_type == 'mksu' && 'MKSU' || 'KernelSU' }}_${{ env.KSUVER }}_${{ github.event.inputs.kernel_version }}
-          path: ./kernel_workspace/AnyKernel3/*
+          path: ./AnyKernel3/*
 
