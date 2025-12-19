@@ -364,14 +364,15 @@ jobs:
           echo "CONFIG_KSU_SUSFS_SUS_MAP=y" >> ./common/arch/arm64/configs/gki_defconfig
           
           if [[ $KERNEL_VERSION == 6.1 ]]; then
-            echo "启用三星SSG IO调度器"
-            echo "CONFIG_MQ_IOSCHED_SSG=y" >> ./arch/arm64/configs/gki_defconfig
-            echo "CONFIG_MQ_IOSCHED_SSG_CGROUP=y" >> ./arch/arm64/configs/gki_defconfig
+           echo "启用三星SSG IO调度器（6.1内核）"
+           echo "CONFIG_MQ_IOSCHED_SSG=y" >> ./common/arch/arm64/configs/gki_defconfig
+           echo "CONFIG_MQ_IOSCHED_SSG_CGROUP=y" >> ./common/arch/arm64/configs/gki_defconfig
           else
-            echo "启用ADIOS IO调度器"
-            echo "CONFIG_MQ_IOSCHED_ADIOS=y" >> ./arch/arm64/configs/gki_defconfig
-            echo "CONFIG_MQ_IOSCHED_DEFAULT_ADIOS=y" >> ./arch/arm64/configs/gki_defconfig
+           echo "启用ADIOS IO调度器（6.6内核）"
+           echo "CONFIG_MQ_IOSCHED_ADIOS=y" >> ./common/arch/arm64/configs/gki_defconfig
+           echo "CONFIG_MQ_IOSCHED_DEFAULT_ADIOS=y" >> ./common/arch/arm64/configs/gki_defconfig
           fi
+
           # Mountify支持
           echo "CONFIG_TMPFS_XATTR=y" >> ./common/arch/arm64/configs/gki_defconfig
           echo "CONFIG_TMPFS_POSIX_ACL=y" >> ./common/arch/arm64/configs/gki_defconfig
