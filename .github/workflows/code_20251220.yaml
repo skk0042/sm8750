@@ -51,6 +51,7 @@ jobs:
               echo "CHIPSET=sm8750" >> $GITHUB_ENV
               echo "ANDROID_VERSION=android15" >> $GITHUB_ENV
               echo "KERNEL_VERSION=6.6" >> $GITHUB_ENV
+              ;;
             # 骁龙8 Gen3（sm8650）
             oneplus_sm8650)
               echo "CHIPSET=sm8650" >> $GITHUB_ENV
