@@ -234,7 +234,7 @@ jobs:
           echo "正在添加压缩补丁（${CHIPSET}处理器适配）..."
           cd kernel_workspace
           # 按处理器选择补丁仓库（sm8750和mt6991用sm8750仓库，其他用sm8650仓库）
-          if [[ $CHIPSET == sm8750 | mt6991 ]]; then
+          if [[ $CHIPSET == sm8750 || $CHIPSET == mt6991 ]]; then
             git clone https://github.com/cctv18/oppo_oplus_realme_sm8750.git patch_repo
           else
             git clone https://github.com/cctv18/oppo_oplus_realme_sm8650.git patch_repo
