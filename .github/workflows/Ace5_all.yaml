@@ -148,7 +148,7 @@ jobs:
             mt6989)
               aria2c -s16 -x16 -k1M https://github.com/cctv18/android_kernel_oneplus_mt6989/archive/refs/heads/oneplus/mt6989_b_16.0.0_ace5_race.zip -o common.zip
               unzip -q common.zip && 
-              mv "android_kernel_oneplus_mt6989-oneplus-mt6989_v_15.0.2_ace5_race" common
+              mv "android_kernel_oneplus_mt6989-oneplus-mt6989_b_16.0.0_ace5_race" common
               ;;
             mt6991)
               # 天玑mt6991 源码仓库
