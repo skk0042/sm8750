@@ -396,43 +396,90 @@ jobs:
 
       - name: 构建内核
         run: |
-          WORKDIR="$(pwd)"
-          export PATH="/usr/lib/ccache:$PATH"
-          export PATH="$WORKDIR/kernel_workspace/$CLANG_DIR:$PATH"
-          export PATH="$WORKDIR/kernel_workspace/build-tools/bin:$PATH"
+         WORKDIR="$(pwd)"
+         export PATH="/usr/lib/ccache:$PATH"
+         export PATH="$WORKDIR/kernel_workspace/$CLANG_DIR:$PATH"
+         export PATH="$WORKDIR/kernel_workspace/build-tools/bin:$PATH"
 
-          export CCACHE_LOGFILE="${{ github.workspace }}/kernel_workspace/ccache.log"
-          export CCACHE_COMPILERCHECK="none"
-          export CCACHE_BASEDIR="${{ github.workspace }}"
-          export CCACHE_NOHASHDIR="true"
-          export CCACHE_HARDLINK="true"
-          export CCACHE_DIR="${{ env.CCACHE_DIR }}"
-          export CCACHE_MAXSIZE="3G"
-          echo "sloppiness = file_stat_matches,include_file_ctime,include_file_mtime,pch_defines,file_macro,time_macros" >> "$CCACHE_DIR/ccache.conf"
-          cd kernel_workspace/common
+         export CCACHE_LOGFILE="${{ github.workspace }}/kernel_workspace/ccache.log"
+         export CCACHE_COMPILERCHECK="none"
+         export CCACHE_BASEDIR="${{ github.workspace }}"
+         export CCACHE_NOHASHDIR="true"
+         export CCACHE_HARDLINK="true"
+         export CCACHE_DIR="${{ env.CCACHE_DIR }}"
+         export CCACHE_MAXSIZE="3G"
+         echo "sloppiness = file_stat_matches,include_file_ctime,include_file_mtime,pch_defines,file_macro,time_macros" >> "$CCACHE_DIR/ccache.conf"
 
-          export KBUILD_BUILD_TIMESTAMP="${{ env.KERNEL_TIME }}"
-          echo "已设置内核构建时间为：$KBUILD_BUILD_TIMESTAMP"
+         cd kernel_workspace/common
 
-          echo '#!/bin/bash' > cc-wrapper && chmod +x cc-wrapper
-          echo 'ccache clang "$@"' >> cc-wrapper
+         export KBUILD_BUILD_TIMESTAMP="${{ env.KERNEL_TIME }}"
+         echo "✅ 已设置内核构建时间为：$KBUILD_BUILD_TIMESTAMP"
 
-          echo '#!/bin/bash' > ld-wrapper && chmod +x ld-wrapper
-          echo 'ld.lld "$@"' >> ld-wrapper
+         CLANG_DIR="$WORKDIR/kernel_workspace/$CLANG_DIR"
+         CLANG_VERSION="$($CLANG_DIR/clang --version | head -n 1)"
+         LLD_VERSION="$($CLANG_DIR/ld.lld --version | head -n 1)"
+         pahole_version=$(pahole --version 2>/dev/null | head -n1); [ -z "$pahole_version" ] && pahole_version="未安装" || pahole_version="$pahole_version"
+         echo "📌 编译器信息:"
+         echo "Clang版本: $CLANG_VERSION"
+         echo "LLD版本: $LLD_VERSION"
+         echo "pahole版本：$pahole_version"
 
-          sudo rm -rf /usr/share/dotnet &
-          sudo rm -rf /usr/local/lib/android &
-          sudo rm -rf /opt/ghc &
-          sudo rm -rf /opt/hostedtoolcache/CodeQL &
-          wait  # 等待后台清理完成
+         wget --tries=3 --timeout=10 https://github.com/cctv18/oppo_oplus_realme_sm8750/raw/refs/heads/main/lib/libfakestat.so
+         wget --tries=3 --timeout=10 https://github.com/cctv18/oppo_oplus_realme_sm8750/raw/refs/heads/main/lib/libfaketimeMT.so
+         chmod 777 ./*.so
 
-          make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" LD="ld.lld" HOSTLD=ld.lld O=out KCFLAGS+=-O2 KCFLAGS+=-Wno-error gki_defconfig &&
-          make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="$(pwd)/cc-wrapper" LD="$(pwd)/ld-wrapper" HOSTLD=ld.lld O=out KCFLAGS+=-O2 KCFLAGS+=-Wno-error Image
-          
-          echo "ccache状态："
-          ccache -s
-          echo "编译后磁盘空间："
-          df -h
+         export FAKESTAT="2025-05-25 12:00:00"
+         export FAKETIME="@$KBUILD_BUILD_TIMESTAMP"
+         SO_DIR=$(pwd)
+         export PRELOAD_LIBS="$SO_DIR/libfakestat.so $SO_DIR/libfaketimeMT.so"
+
+         echo '#!/bin/bash' > test-wrapper.sh
+         echo 'export LD_PRELOAD="'$PRELOAD_LIBS'"' >> test-wrapper.sh
+         echo 'export FAKESTAT="'$FAKESTAT'"' >> test-wrapper.sh
+         echo 'export FAKETIME="'$FAKETIME'"' >> test-wrapper.sh
+         echo 'echo ">>> 时间劫持环境检查完毕."' >> test-wrapper.sh
+         echo 'exec "$@"' >> test-wrapper.sh
+         chmod +x test-wrapper.sh
+         echo "--- [测试] 时间劫持有效性（仅ARM运行器生效） ---"
+         ./test-wrapper.sh date  
+         ./test-wrapper.sh stat ./Makefile
+         echo "--- [测试] 时间劫持验证结束 ---"
+
+         echo '#!/bin/bash' > cc-wrapper && chmod +x cc-wrapper
+         echo 'export LD_PRELOAD="'$PRELOAD_LIBS'"' >> cc-wrapper
+         echo 'export FAKESTAT="'$FAKESTAT'"' >> cc-wrapper
+         echo 'export FAKETIME="'$FAKETIME'"' >> cc-wrapper
+         echo 'ccache clang "$@"' >> cc-wrapper
+
+         echo '#!/bin/bash' > ld-wrapper && chmod +x ld-wrapper
+         echo 'export LD_PRELOAD="'$PRELOAD_LIBS'"' >> ld-wrapper
+         echo 'export FAKESTAT="'$FAKESTAT'"' >> ld-wrapper
+         echo 'export FAKETIME="'$FAKETIME'"' >> ld-wrapper
+         echo 'ld.lld "$@"' >> ld-wrapper
+         chmod +x cc-wrapper ld-wrapper
+
+         echo "🗑️  后台清理冗余文件..."
+         sudo rm -rf /usr/share/dotnet &
+         sudo rm -rf /usr/local/lib/android &
+         sudo rm -rf /opt/ghc &
+         sudo rm -rf /opt/hostedtoolcache/CodeQL &
+         wait  # 等待清理完成，避免占用磁盘
+
+         echo "🚀 开始编译内核..."
+         make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" LD="ld.lld" HOSTLD=ld.lld O=out KCFLAGS+=-O2 KCFLAGS+=-Wno-error gki_defconfig &&
+         make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="$(pwd)/cc-wrapper" LD="$(pwd)/ld-wrapper" HOSTLD=ld.lld O=out KCFLAGS+=-O2 KCFLAGS+=-Wno-error Image
+
+         echo "--- [校验] 编译后环境状态 ---"
+         if [[ -f "libfakestat.so" ]]; then
+          echo "编译后劫持时间: $(LD_PRELOAD=$PRELOAD_LIBS date)"
+         fi
+         echo "内核镜像路径: $(find ./out -name "Image" | head -n1)"
+
+         echo "✅ 内核编译完成！"
+         echo "📊 ccache状态："
+         ccache -s
+         echo "💾 编译后磁盘空间:"
+         df -h
         if: contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
 
       - name: 制作 Anykernel3
