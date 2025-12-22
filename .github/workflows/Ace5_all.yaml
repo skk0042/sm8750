@@ -412,8 +412,6 @@ jobs:
 
          cd kernel_workspace/common
 
-         export KBUILD_BUILD_TIMESTAMP="${{ env.KERNEL_TIME }}"
-         echo "✅ 已设置内核构建时间为：$KBUILD_BUILD_TIMESTAMP"
 
          CLANG_DIR="$WORKDIR/kernel_workspace/$CLANG_DIR"
          CLANG_VERSION="$($CLANG_DIR/clang --version | head -n 1)"
@@ -429,7 +427,7 @@ jobs:
          chmod 777 ./*.so
 
          export FAKESTAT="2025-05-25 12:00:00"
-         export FAKETIME="@$KBUILD_BUILD_TIMESTAMP"
+         export FAKETIME="@2025-05-25 13:00:00"
          SO_DIR=$(pwd)
          export PRELOAD_LIBS="$SO_DIR/libfakestat.so $SO_DIR/libfaketimeMT.so"
 
@@ -458,6 +456,9 @@ jobs:
          echo 'ld.lld "$@"' >> ld-wrapper
          chmod +x cc-wrapper ld-wrapper
 
+         export KBUILD_BUILD_TIMESTAMP="${{ env.KERNEL_TIME }}"
+         echo "✅ 已设置内核构建时间为：$KBUILD_BUILD_TIMESTAMP"
+         
          echo "🗑️  后台清理冗余文件..."
          sudo rm -rf /usr/share/dotnet &
          sudo rm -rf /usr/local/lib/android &
