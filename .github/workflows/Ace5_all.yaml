@@ -16,10 +16,9 @@ on:
         required: false
         default: ''
       custom_kernel_time:
-        description: "自定义构建时间（格式：Tue Jul  1 19:48:18 UTC 2025）"
+        description: "自定义构建时间- 仅在取消勾选'保持原设置'时有效"
         required: false
         default: ''
-
 jobs:
   batch_build:
     name: Build_${{ matrix.DEVICE }}
@@ -37,7 +36,6 @@ jobs:
       KEEP_ORIGINAL_SETTINGS: ${{ github.event.inputs.keep_original_settings }}
       CUSTOM_KERNEL_SUFFIX:   ${{ github.event.inputs.custom_kernel_suffix }}
       CUSTOM_KERNEL_TIME:     ${{ github.event.inputs.custom_kernel_time }}
-      ENABLE_FEATURE_Z:       ${{ github.event.inputs.enable_feature_z }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -231,7 +229,7 @@ jobs:
           fi
         if: contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
 
-      - name: 添加 lz4 1.10.0 & zstd 1.5.7补丁（按处理器区分补丁来源）
+      - name: 添加 lz4 1.10.0 & zstd 1.5.7补丁
         run: |
           echo "正在添加压缩补丁（${CHIPSET}处理器适配）..."
           cd kernel_workspace
@@ -246,8 +244,8 @@ jobs:
           cp ./patch_repo/zram_patch/lz4armv8.S ./common/lib
           cp ./patch_repo/zram_patch/002-zstd.patch ./common/
           
-          # 天玑机型额外应用clearMake补丁
-          if [[ $CHIPSET == mt69* ]]; then
+          # 天玑6991机型额外应用clearMake补丁
+          if [[ $CHIPSET == mt6991 ]]; then
             cp ./patch_repo/zram_patch/001-lz4-clearMake.patch ./common
           fi
           
@@ -263,13 +261,6 @@ jobs:
           rm -rf ../patch_repo
         if: contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
 
-      - name: 集成 BBG 基带保护
-        run: |
-          cd kernel_workspace/common
-          echo "正在启用BBG基带守护..."
-          curl -LSs https://raw.githubusercontent.com/vc-teahouse/Baseband-guard/main/setup.sh | bash
-          sed -i '/^config LSM$/,/^help$/{ /^[[:space:]]*default/ { /baseband_guard/! s/lockdown/lockdown,baseband_guard/ } }' ./security/Kconfig
-        if: contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
 
       - name: 配置 SuKiSU Ultra
         run: |
@@ -307,33 +298,33 @@ jobs:
           echo "SukiSU版本号: v${KSU_API_VERSION}-${GIT_COMMIT_HASH}-TG@SKK0042NB"
         if: contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
 
-      - name: 配置 SUSFS（按内核版本匹配补丁）
+      - name: 配置 SUSFS
         run: |
           cd kernel_workspace
           echo "正在添加SUSFS补丁（${KERNEL_VERSION}内核适配）..."
-          git clone https://github.com/ShirkNeko/susfs4ksu.git -b gki-android15-${KERNEL_VERSION}
+          git clone https://github.com/ShirkNeko/susfs4ksu.git -b gki-${ANDROID_VERSION}-${KERNEL_VERSION}
           git clone https://github.com/ShirkNeko/SukiSU_patch.git
           
           # 复制补丁和文件
-          cp ./susfs4ksu/kernel_patches/50_add_susfs_in_gki-android15-${KERNEL_VERSION}.patch ./common/
+          cp ./susfs4ksu/kernel_patches/50_add_susfs_in_gki-${ANDROID_VERSION}-${KERNEL_VERSION}.patch ./common/
           cp ./susfs4ksu/kernel_patches/fs/* ./common/fs/
           cp ./susfs4ksu/kernel_patches/include/linux/* ./common/include/linux/
           cp ./SukiSU_patch/69_hide_stuff.patch ./common/
           
           cd ./common          
-          patch -p1 < 50_add_susfs_in_gki-android15-${KERNEL_VERSION}.patch || true
-          # 天玑机型修复task_mmu.c编译错误
-          if [[ $CHIPSET == mt69* ]]; then
+          patch -p1 < 50_add_susfs_in_gki-${ANDROID_VERSION}-${KERNEL_VERSION}.patch || true
+          # 天玑6991机型修复task_mmu.c编译错误
+          if [[ $CHIPSET == mt6991 ]]; then
               sed -i 's|vma = find_vma(mm|struct vm_area_struct *&|' ./fs/proc/task_mmu.c
           fi
           patch -p1 < 69_hide_stuff.patch || true
           
           # 清理补丁文件
-          rm -f 50_add_susfs_in_gki-android15-${KERNEL_VERSION}.patch 69_hide_stuff.patch
+          rm -f 50_add_susfs_in_gki-${ANDROID_VERSION}-${KERNEL_VERSION}.patch 69_hide_stuff.patch
           rm -rf ../susfs4ksu ../SukiSU_patch
         if: contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
 
-      - name: 设置编译配置（按处理器启用功能+IO调度器）
+      - name: 设置编译配置
         run: |
           cd kernel_workspace
           echo "CONFIG_KSU=y" >> ./common/arch/arm64/configs/gki_defconfig
@@ -371,18 +362,17 @@ jobs:
           echo "CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y" >> ./common/arch/arm64/configs/gki_defconfig
           echo "CONFIG_KSU_SUSFS_OPEN_REDIRECT=y" >> ./common/arch/arm64/configs/gki_defconfig
           echo "CONFIG_KSU_SUSFS_SUS_MAP=y" >> ./common/arch/arm64/configs/gki_defconfig
-
-          # IO调度器配置（6.1用SSG，6.6用ADIOS）
-          if [[ $KERNEL_VERSION == 6.1 ]]; then
-            echo "启用三星SSG IO调度器（6.1内核适配）"
-            echo "CONFIG_MQ_IOSCHED_SSG=y" >> ./common/arch/arm64/configs/gki_defconfig
-            echo "CONFIG_MQ_IOSCHED_SSG_CGROUP=y" >> ./common/arch/arm64/configs/gki_defconfig
-          else
-            echo "启用ADIOS IO调度器（6.6内核适配）"
-            echo "CONFIG_MQ_IOSCHED_ADIOS=y" >> ./common/arch/arm64/configs/gki_defconfig
-            echo "CONFIG_MQ_IOSCHED_DEFAULT_ADIOS=y" >> ./common/arch/arm64/configs/gki_defconfig
-          fi
           
+          if [[ $KERNEL_VERSION == 6.1 ]]; then
+           echo "启用三星SSG IO调度器（6.1内核）"
+           echo "CONFIG_MQ_IOSCHED_SSG=y" >> ./common/arch/arm64/configs/gki_defconfig
+           echo "CONFIG_MQ_IOSCHED_SSG_CGROUP=y" >> ./common/arch/arm64/configs/gki_defconfig
+          else
+           echo "启用ADIOS IO调度器（6.6内核）"
+           echo "CONFIG_MQ_IOSCHED_ADIOS=y" >> ./common/arch/arm64/configs/gki_defconfig
+           echo "CONFIG_MQ_IOSCHED_DEFAULT_ADIOS=y" >> ./common/arch/arm64/configs/gki_defconfig
+          fi
+
           # Mountify支持
           echo "CONFIG_TMPFS_XATTR=y" >> ./common/arch/arm64/configs/gki_defconfig
           echo "CONFIG_TMPFS_POSIX_ACL=y" >> ./common/arch/arm64/configs/gki_defconfig
@@ -404,15 +394,20 @@ jobs:
         if: contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
 
 
-      - name: 构建内核（移植文件3逻辑+整合文件2时间配置+保留官方配置）
+      - name: 构建内核
         run: |
           WORKDIR="$(pwd)"
-          # ========== 1. 完全对齐文件3：基础环境配置（编译器路径+CCACHE） ==========
           export PATH="/usr/lib/ccache:$PATH"
-          export PATH="$WORKDIR/kernel_workspace/$CLANG_DIR:$PATH"
+          export PATH="$WORKDIR/kernel_workspace/clang18/bin:$PATH"
           export PATH="$WORKDIR/kernel_workspace/build-tools/bin:$PATH"
+          CLANG_DIR="$WORKDIR/kernel_workspace/clang18/bin"
+          CLANG_VERSION="$($CLANG_DIR/clang --version | head -n 1)"
+          LLD_VERSION="$($CLANG_DIR/ld.lld --version | head -n 1)"
+          echo "编译器信息:"
+          echo "Clang版本: $CLANG_VERSION"
+          echo "LLD版本: $LLD_VERSION"
+          pahole_version=$(pahole --version 2>/dev/null | head -n1); [ -z "$pahole_version" ] && echo "pahole版本：未安装" || echo "pahole版本：$pahole_version"
           
-          # CCACHE配置（完全移植文件3，补充容错）
           export CCACHE_LOGFILE="${{ github.workspace }}/kernel_workspace/ccache.log"
           export CCACHE_COMPILERCHECK="none"
           export CCACHE_BASEDIR="${{ github.workspace }}"
@@ -420,27 +415,50 @@ jobs:
           export CCACHE_HARDLINK="true"
           export CCACHE_DIR="${{ env.CCACHE_DIR }}"
           export CCACHE_MAXSIZE="3G"
-          echo "sloppiness = file_stat_matches,include_file_ctime,include_file_mtime,pch_defines,file_macro,time_macros" >> "$CCACHE_DIR/ccache.conf" 2>/dev/null || true
-
-          # ========== 2. 移植文件3：打印编译器信息（便于调试，保留官方工具链关联） ==========
-          CLANG_DIR_FULL="$WORKDIR/kernel_workspace/$CLANG_DIR"
-          if [[ -d "$CLANG_DIR_FULL" ]]; then
-            CLANG_VERSION="$($CLANG_DIR_FULL/clang --version | head -n 1 || echo "未知版本")"
-            LLD_VERSION="$($CLANG_DIR_FULL/ld.lld --version | head -n 1 || echo "未知版本")"
-          else
-            CLANG_VERSION="编译器路径不存在"
-            LLD_VERSION="链接器路径不存在"
-          fi
-          pahole_version=$(pahole --version 2>/dev/null | head -n1); [ -z "$pahole_version" ] && pahole_version="未安装" || pahole_version="$pahole_version"
-          echo "📌 构建环境信息（关联官方工具链）:"
-          echo "处理器型号: ${{ env.CHIPSET }}"
-          echo "内核版本: ${{ env.KERNEL_VERSION }}"
-          echo "Clang版本: $CLANG_VERSION"
-          echo "LLD版本: $LLD_VERSION"
-          echo "pahole版本：$pahole_version"
-          echo "官方配置构建时间: ${{ env.KERNEL_TIME }}"
-
-          # ========== 3. 整合文件2：构建时间深度配置（修改内核编译系统） ==========
+          echo "sloppiness = file_stat_matches,include_file_ctime,include_file_mtime,pch_defines,file_macro,time_macros" >> "$CCACHE_DIR/ccache.conf"
+          
+          cd kernel_workspace/common
+          wget https://github.com/cctv18/oppo_oplus_realme_sm8750/raw/refs/heads/main/lib/libfakestat.so
+          wget https://github.com/cctv18/oppo_oplus_realme_sm8750/raw/refs/heads/main/lib/libfaketimeMT.so
+          chmod 777 ./*.so
+          export FAKESTAT="2025-05-25 12:00:00"
+          export FAKETIME="@2025-05-25 13:00:00"
+          echo "FAKESTAT=$FAKESTAT" >> $GITHUB_ENV
+          echo "FAKETIME=$FAKETIME" >> $GITHUB_ENV
+          SO_DIR=$(pwd)
+          export PRELOAD_LIBS="$SO_DIR/libfakestat.so $SO_DIR/libfaketimeMT.so"
+          #创建 CC (编译器) 包装器
+          echo '#!/bin/bash' > cc-wrapper
+          echo 'export LD_PRELOAD="'$PRELOAD_LIBS'"' >> cc-wrapper
+          echo 'export FAKESTAT="'$FAKESTAT'"' >> cc-wrapper
+          echo 'export FAKETIME="'$FAKETIME'"' >> cc-wrapper
+          echo 'ccache clang "$@"' >> cc-wrapper
+          #创建 LD (链接器) 包装器
+          echo '#!/bin/bash' > ld-wrapper
+          echo 'export LD_PRELOAD="'$PRELOAD_LIBS'"' >> ld-wrapper
+          echo 'export FAKESTAT="'$FAKESTAT'"' >> ld-wrapper
+          echo 'export FAKETIME="'$FAKETIME'"' >> ld-wrapper
+          echo 'ld.lld "$@"' >> ld-wrapper
+          
+          # 测试时间劫持测试是否正常工作
+          echo "--- [Wrapper Test] 正在创建通用的时间劫持测试脚本 ---"
+          echo '#!/bin/bash' > test-wrapper.sh
+          echo 'export LD_PRELOAD="'$PRELOAD_LIBS'"' >> test-wrapper.sh
+          echo 'export FAKESTAT="'$FAKESTAT'"' >> test-wrapper.sh
+          echo 'export FAKETIME="'$FAKETIME'"' >> test-wrapper.sh
+          echo 'echo ">>> Wrapper 内部环境检查完毕."' >> test-wrapper.sh
+          echo 'exec "$@"' >> test-wrapper.sh # 执行所有传入的参数
+          chmod +x test-wrapper.sh
+          echo "--- [Wrapper Test] 正在测试 (date) 命令 ---"
+          ./test-wrapper.sh date
+          echo "--- [Wrapper Test] 正在测试 (stat) 命令 ---"
+          ./test-wrapper.sh stat ./Makefile
+          echo "--- [Wrapper Test] 测试完毕 ---"
+          chmod +x cc-wrapper ld-wrapper
+          echo "--- 编译前环境时间: $(LD_PRELOAD=$PRELOAD_LIBS date) ---"
+          echo "--- 编译前环境文件时间戳: ---"
+          LD_PRELOAD=$PRELOAD_LIBS stat ./Makefile
+          
           INPUT_TIME="${{ env.KERNEL_TIME }}"
           if [[ -n "$INPUT_TIME" ]]; then
             DATESTR="$INPUT_TIME"
@@ -462,95 +480,26 @@ jobs:
               break
             fi
           done
-          # 同步设置内核原生环境变量（双重保障）
-          export KBUILD_BUILD_TIMESTAMP="$DATESTR"
-          export KBUILD_BUILD_VERSION=1
-
-          # ========== 4. 移植文件3：时间劫持（仅ARM运行器生效，x86_64删除以下3行） ==========
-          wget --tries=3 --timeout=10 https://github.com/cctv18/oppo_oplus_realme_sm8650/raw/refs/heads/main/lib/libfakestat.so 2>/dev/null || true
-          wget --tries=3 --timeout=10 https://github.com/cctv18/oppo_oplus_realme_sm8650/raw/refs/heads/main/lib/libfaketimeMT.so 2>/dev/null || true
-          chmod 777 ./*.so 2>/dev/null || true
-          # 时间劫持环境变量（对齐文件3）
-          export FAKESTAT="$(echo $DATESTR | awk '{print $1,$2,$3,$4}')"
-          export FAKETIME="@$DATESTR"
-          SO_DIR="$WORKDIR/kernel_workspace/common"
-          export PRELOAD_LIBS="$SO_DIR/libfakestat.so $SO_DIR/libfaketimeMT.so"
-
-          # ========== 5. 移植文件3：创建编译器/链接器包装器（保留容错） ==========
-          cd "$WORKDIR/kernel_workspace/common"
-          # 编译器包装器
-          echo '#!/bin/bash' > cc-wrapper && chmod +x cc-wrapper
-          echo 'export LD_PRELOAD="'$PRELOAD_LIBS'" 2>/dev/null || true' >> cc-wrapper
-          echo 'export FAKESTAT="'$FAKESTAT'" 2>/dev/null || true' >> cc-wrapper
-          echo 'export FAKETIME="'$FAKETIME'" 2>/dev/null || true' >> cc-wrapper
-          echo 'ccache clang "$@"' >> cc-wrapper
-          # 链接器包装器
-          echo '#!/bin/bash' > ld-wrapper && chmod +x ld-wrapper
-          echo 'export LD_PRELOAD="'$PRELOAD_LIBS'" 2>/dev/null || true' >> ld-wrapper
-          echo 'export FAKESTAT="'$FAKESTAT'" 2>/dev/null || true' >> ld-wrapper
-          echo 'export FAKETIME="'$FAKETIME'" 2>/dev/null || true' >> ld-wrapper
-          echo 'ld.lld "$@"' >> ld-wrapper
-
-          # ========== 6. 移植文件3：时间劫持测试（调试用） ==========
-          echo '#!/bin/bash' > test-wrapper.sh && chmod +x test-wrapper.sh
-          echo 'export LD_PRELOAD="'$PRELOAD_LIBS'" 2>/dev/null || true' >> test-wrapper.sh
-          echo 'export FAKESTAT="'$FAKESTAT'" 2>/dev/null || true' >> test-wrapper.sh
-          echo 'export FAKETIME="'$FAKETIME'" 2>/dev/null || true' >> test-wrapper.sh
-          echo 'echo ">>> 时间劫持环境检查完毕（仅ARM运行器生效）"' >> test-wrapper.sh
-          echo 'exec "$@"' >> test-wrapper.sh
-          echo "--- [测试] 时间劫持有效性（x86_64运行器可忽略报错） ---"
-          ./test-wrapper.sh date || echo "x86_64运行器：时间劫持测试跳过"
-          ./test-wrapper.sh stat ./Makefile 2>/dev/null || echo "x86_64运行器：stat测试跳过"
-          echo "--- [测试] 时间劫持验证结束 ---"
-
-          # ========== 7. 优化点：创建3G Swap（避免内存不足） ==========
-          if [[ ! -f "/swapfile" ]]; then
-            echo "🗑️ 创建3G Swap分区（优化内存不足问题）"
-            sudo swapoff -a
-            sudo fallocate -l 3G /swapfile
-            sudo chmod 600 /swapfile
-            sudo mkswap /swapfile
-            sudo swapon /swapfile
-            free -h | grep Swap
-          fi
-
-          # ========== 8. 完全移植文件3：后台清理冗余文件 ==========
-          echo "🗑️ 后台清理冗余文件（.NET/Android SDK等）"
+          #在构建内核的同时清除不必要的.NET, Android NDK, Haskell, CodeQL运行库，清理空间且不阻塞后续步骤运行
           sudo rm -rf /usr/share/dotnet &
           sudo rm -rf /usr/local/lib/android &
           sudo rm -rf /opt/ghc &
           sudo rm -rf /opt/hostedtoolcache/CodeQL &
-          wait
-
-          # ========== 9. 完全移植文件3：编译内核 ==========
-          echo "🚀 开始编译内核（处理器：${{ env.CHIPSET }}，内核版本：${{ env.KERNEL_VERSION }}）"
           make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" LD="ld.lld" HOSTLD=ld.lld O=out KCFLAGS+=-O2 KCFLAGS+=-Wno-error gki_defconfig &&
           make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="$(pwd)/cc-wrapper" LD="$(pwd)/ld-wrapper" HOSTLD=ld.lld O=out KCFLAGS+=-O2 KCFLAGS+=-Wno-error Image
-
-          # ========== 10. 优化点：编译后校验 ==========
-          echo "--- [校验] 编译后状态 ---"
-          IMAGE_PATH=$(find ./out -name "Image" | head -n 1)
-          if [[ -z "$IMAGE_PATH" || ! -f "$IMAGE_PATH" ]]; then
-            echo "❌ 未找到内核镜像文件（Image），构建失败" >&2
-            exit 1
-          else
-            echo "✅ 内核镜像路径: $IMAGE_PATH"
-            if strings "$IMAGE_PATH" | grep -q "$(echo $DATESTR | awk '{print $1,$2,$3}')"; then
-              echo "✅ 构建时间已成功写入内核：$DATESTR"
-            else
-              echo "⚠️  构建时间未检测到（x86_64运行器属正常，ARM需检查so文件）"
-            fi
-          fi
-
-          # ========== 11. 移植文件3：输出关键状态 ==========
-          echo "✅ 内核编译完成！"
-          echo "📊 ccache状态："
+          
+          # 编译后时间劫持二次校验
+          echo "--- 编译后环境时间: $(LD_PRELOAD=$PRELOAD_LIBS date) ---"
+          echo "--- 编译后环境文件时间戳: ---"
+          LD_PRELOAD=$PRELOAD_LIBS stat ./Makefile
+          echo "内核编译完成！"
+          echo "ccache状态："
           ccache -s
-          echo "💾 编译后磁盘空间:"
+          echo "编译后空间:"
           df -h
         if: contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
 
-      - name: 制作 Anykernel3（按处理器复制额外文件）
+      - name: 制作 Anykernel3
         run: |
           git clone https://github.com/skk0042/AnyKernel3 --depth=1
           rm -rf ./AnyKernel3/.git
@@ -580,7 +529,7 @@ jobs:
           fi
         if: contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
 
-      - name: 上传 Anykernel3（按处理器命名）
+      - name: 上传 Anykernel3
         uses: actions/upload-artifact@v4
         with:
           name: SukiSU_${{ env.KSUVER }}_${{ env.CHIPSET }}
