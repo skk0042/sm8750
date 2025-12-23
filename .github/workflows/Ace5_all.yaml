@@ -45,7 +45,7 @@ jobs:
           fetch-depth: 0
         if: contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
 
-     - name: 处理器型号配置
+      - name: 处理器型号配置
         run: |
           case "${{ env.DEVICES_NAME }}" in
             # 骁龙8 Elite（sm8750)
