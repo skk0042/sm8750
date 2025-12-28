@@ -46,32 +46,27 @@ jobs:
       - name: 处理器型号配置
         run: |
           case "${{ env.DEVICES_NAME }}" in
-            # 骁龙8 Elite（sm8750)
             oneplus_sm8750)
               echo "CHIPSET=sm8750" >> $GITHUB_ENV
               echo "ANDROID_VERSION=android15" >> $GITHUB_ENV
               echo "KERNEL_VERSION=6.6" >> $GITHUB_ENV
               ;;
-            # 骁龙8 Gen3（sm8650）
             oneplus_sm8650)
               echo "CHIPSET=sm8650" >> $GITHUB_ENV
               echo "ANDROID_VERSION=android14" >> $GITHUB_ENV
               echo "KERNEL_VERSION=6.1" >> $GITHUB_ENV
               ;;
-            # 天玑9400+（mt6991)
             oneplus_mt6991)
               echo "CHIPSET=mt6991" >> $GITHUB_ENV
               echo "ANDROID_VERSION=android15" >> $GITHUB_ENV
               echo "KERNEL_VERSION=6.6" >> $GITHUB_ENV
               ;;
-            # 天玑9400e（mt6989)
             oneplus_mt6989)
               echo "CHIPSET=mt6989" >> $GITHUB_ENV
               echo "ANDROID_VERSION=android14" >> $GITHUB_ENV
               echo "KERNEL_VERSION=6.1" >> $GITHUB_ENV
               ;;
           esac
-          # 配置默认内核名称（按处理器对应官核后缀）
           if [ "${{ env.KEEP_ORIGINAL_SETTINGS }}" = "true" ] && [ -z "${{ github.event.inputs.custom_kernel_suffix }}" ]; then
             case "${{ env.DEVICES_NAME }}" in
               oneplus_sm8750)
@@ -84,7 +79,7 @@ jobs:
                 echo 'DEFAULT_SUFFIX=-android15-8-gd43086512890-abogki423825152-4k' >> $GITHUB_ENV
                 ;;
               oneplus_mt6989)
-                echo 'DEFAULT_SUFFIX=-android14-11-o-g8f3b9b4f58d8' >> $GITHUB_ENV
+                echo 'DEFAULT_SUFFIX=-android14-8-gca13bffobf09' >> $GITHUB_ENV
                 ;;
             esac
             echo "使用官核默认名称：${{ env.DEFAULT_SUFFIX }}"
@@ -92,20 +87,19 @@ jobs:
             echo "使用自定义名称: ${{ github.event.inputs.custom_kernel_suffix }}"
             echo "DEFAULT_SUFFIX=${{ github.event.inputs.custom_kernel_suffix }}" >> $GITHUB_ENV
           fi
-          # 配置默认构建时间（按处理器对应官核时间）
           if [ "${{ env.KEEP_ORIGINAL_SETTINGS }}" = "true" ] && [ -z "${{ github.event.inputs.custom_kernel_time }}" ]; then
             case "${{ env.DEVICES_NAME }}" in
               oneplus_sm8750)
-                echo 'KERNEL_TIME=Tue Dec  9 18:26:36 CST 2025' >> $GITHUB_ENV
+                echo 'KERNEL_TIME=Tue Jul  1 19:48:18 UTC 2025' >> $GITHUB_ENV
                 ;;
               oneplus_sm8650)
-                echo 'KERNEL_TIME=Mon Nov 17 22:21:29 CST 2025' >> $GITHUB_ENV
+                echo 'KERNEL_TIME=Fri Sep 19 06:13:40 UTC 2025' >> $GITHUB_ENV
                 ;;
               oneplus_mt6991)
                 echo 'KERNEL_TIME=Tue Jun 10 12:12:23 UTC 2025' >> $GITHUB_ENV
                 ;;
               oneplus_mt6989)
-                echo 'KERNEL_TIME=Tue Dec  9 22:26:24 CST 2025' >> $GITHUB_ENV
+                echo 'KERNEL_TIME=Tue Jul  1 19:48:18 UTC 2025' >> $GITHUB_ENV
                 ;;
             esac
             echo "使用官核默认时间: ${{ env.KERNEL_TIME }}"
@@ -121,23 +115,20 @@ jobs:
           mkdir kernel_workspace
           cd kernel_workspace
           
-          # 安装基础依赖（新增ccache依赖）
           sudo apt-mark hold firefox libc-bin &&
           sudo apt purge man-db &&
           sudo rm -rf /var/lib/man-db/auto-update &&
           sudo apt update &&
           sudo apt-get install -y --no-install-recommends binutils python-is-python3 libssl-dev libelf-dev dos2unix ccache p7zip-full aria2
-          # 按处理器克隆对应源码仓库
+          
           echo "正在克隆 ${CHIPSET} 处理器的内核源码..."
           case "${{ env.CHIPSET }}" in
             sm8750)
-              # 骁龙8 Elite 源码仓库
               aria2c -s16 -x16 -k1M https://github.com/cctv18/android_kernel_common_oneplus_sm8750/archive/refs/heads/oneplus/sm8750_v_16.0.0_oneplus_13_6.6.89.zip -o common.zip
               unzip -q common.zip && 
               mv "android_kernel_common_oneplus_sm8750-oneplus-sm8750_v_16.0.0_oneplus_13_6.6.89" common
               ;;
             sm8650)
-              # 骁龙8 Gen3 源码仓库
               aria2c -s16 -x16 -k1M https://github.com/cctv18/android_kernel_common_oneplus_sm8650/archive/refs/heads/oneplus/sm8650_v_15.0.0_oneplus12_6.1.118.zip -o common.zip
               unzip -q common.zip && 
               mv "android_kernel_common_oneplus_sm8650-oneplus-sm8650_v_15.0.0_oneplus12_6.1.118" common
@@ -148,32 +139,42 @@ jobs:
               mv "android_kernel_oneplus_mt6989-oneplus-mt6989_b_16.0.0_ace5_race" common
               ;;
             mt6991)
-              # 天玑mt6991 源码仓库
               aria2c -s16 -x16 -k1M https://github.com/cctv18/android_kernel_oneplus_mt6991/archive/refs/heads/oneplus/mt6991_v_15.0.2_ace5_ultra_6.6.89.zip -o common.zip
               unzip -q common.zip && 
               mv "android_kernel_oneplus_mt6991-oneplus-mt6991_v_15.0.2_ace5_ultra_6.6.89" common
               ;;
           esac
           rm -rf common.zip 
-          # 按内核版本选择工具链（6.1用Clang20，6.6用Clang18）
+          
           echo "正在克隆工具链（${KERNEL_VERSION}内核适配）..."
           if [[ $KERNEL_VERSION == 6.1.* ]]; then
             mkdir -p clang20 &&
             aria2c -s16 -x16 -k1M https://github.com/cctv18/oneplus_sm8650_toolchain/releases/download/LLVM-Clang20-r547379/clang-r547379.zip -o clang.zip &&
             unzip -q clang.zip -d clang20 && rm -rf clang.zip
             echo "CLANG_DIR=clang20/bin" >> $GITHUB_ENV
+            # 新增：验证clang20工具链是否解压成功
+            if [ ! -f "clang20/bin/clang" ] || [ ! -f "clang20/bin/ld.lld" ]; then
+              echo "❌ clang20工具链解压失败，文件缺失"
+              ls -la clang20/bin/
+              exit 1
+            fi
           else
             mkdir -p clang18 &&
-            aria2c -s16 -x16 -k1M https://github.com/cctv18/oneplus_sm8650_toolchain/releases/download/LLVM-Clang188-r510928/clang-r510928.zip -o clang.zip &&
+            aria2c -s16 -x16 -k1M https://github.com/cctv18/oneplus_sm8650_toolchain/releases/download/LLVM-Clang18-r510928/clang-r510928.zip -o clang.zip &&
             unzip -q clang.zip -d clang18 && rm -rf clang.zip
             echo "CLANG_DIR=clang18/bin" >> $GITHUB_ENV
+            # 新增：验证clang18工具链是否解压成功
+            if [ ! -f "clang18/bin/clang" ] || [ ! -f "clang18/bin/ld.lld" ]; then
+              echo "❌ clang18工具链解压失败，文件缺失"
+              ls -la clang18/bin/
+              exit 1
+            fi
           fi
-          # 克隆构建工具
+          
           aria2c -s16 -x16 -k1M https://github.com/cctv18/oneplus_sm8650_toolchain/releases/download/LLVM-Clang18-r510928/build-tools.zip -o build-tools.zip &&
           unzip -q build-tools.zip && rm -rf build-tools.zip &
           wait
-          # 去除ABI保护和dirty后缀
-          echo "初始化源码环境..."
+          
           rm common/android/abi_gki_protected_exports_* || true
           for f in common/scripts/setlocalversion; do
             sed -i 's/ -dirty//g' "$f"
@@ -181,7 +182,6 @@ jobs:
           done
         if: contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
 
-      # 新增ccache配置步骤（不破坏原有流程）
       - name: 配置 ccache（按处理器区分缓存目录）
         run: |
           echo "CCACHE_DIR=$HOME/.ccache_${{ env.DEVICES_NAME }}" >> $GITHUB_ENV
@@ -226,9 +226,8 @@ jobs:
 
       - name: 添加 lz4 1.10.0 & zstd 1.5.7补丁
         run: |
-          echo "正在添加压缩补丁（${CHIPSET}处理器适配）..."
           cd kernel_workspace
-          # 按处理器选择补丁仓库（sm8750和mt6991用sm8750仓库，其他用sm8650仓库）
+          echo "正在添加压缩补丁（${CHIPSET}处理器适配）..."
           if [[ $CHIPSET == sm8750 || $CHIPSET == mt6991 ]]; then
             git clone https://github.com/cctv18/oppo_oplus_realme_sm8750.git patch_repo
           else
@@ -239,7 +238,6 @@ jobs:
           cp ./patch_repo/zram_patch/lz4armv8.S ./common/lib
           cp ./patch_repo/zram_patch/002-zstd.patch ./common/
           
-          # 天玑6991机型额外应用clearMake补丁
           if [[ $CHIPSET == mt6991 ]]; then
             cp ./patch_repo/zram_patch/001-lz4-clearMake.patch ./common
           fi
@@ -251,7 +249,6 @@ jobs:
           fi
           patch -p1 < 002-zstd.patch || true
           
-          # 清理补丁文件
           rm -f 001-lz4.patch 002-zstd.patch 001-lz4-clearMake.patch
           rm -rf ../patch_repo
         if: contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
@@ -263,7 +260,6 @@ jobs:
           curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU-Ultra/refs/heads/main/kernel/setup.sh" | bash -s builtin
           cd ./KernelSU
           
-          # 获取版本信息
           GIT_COMMIT_HASH=$(git rev-parse --short=8 HEAD)
           for i in {1..3}; do
             KSU_API_VERSION=$(curl -s "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/builtin/kernel/Kbuild" | 
@@ -274,7 +270,6 @@ jobs:
           done
           [ -z "$KSU_API_VERSION" ] && KSU_API_VERSION="3.1.7"
           
-          # 写入版本定义
           VERSION_DEFINITIONS=$'define get_ksu_version_full\nv\\$1-'"$GIT_COMMIT_HASH"$'-TG@SKK0042NB\nendef\n\nKSU_VERSION_API := '"$KSU_API_VERSION"$'\nKSU_VERSION_FULL := v'"$KSU_API_VERSION"$'-'"$GIT_COMMIT_HASH"$'-TG@SKK0042NB'
           sed -i '/define get_ksu_version_full/,/endef/d' kernel/Kbuild
           sed -i '/KSU_VERSION_API :=/d' kernel/Kbuild
@@ -285,7 +280,6 @@ jobs:
             END {if (!inserted) print def}
           ' kernel/Kbuild > kernel/Kbuild.tmp && mv kernel/Kbuild.tmp kernel/Kbuild
           
-          # 输出版本
           KSU_VERSION=$(expr $(git rev-list --count main) + 37185 2>/dev/null || echo 114514)
           echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV
           echo "ksuver=$KSU_VERSION" >> $GITHUB_OUTPUT
@@ -299,7 +293,6 @@ jobs:
           git clone https://github.com/ShirkNeko/susfs4ksu.git -b gki-${ANDROID_VERSION}-${KERNEL_VERSION}
           git clone https://github.com/ShirkNeko/SukiSU_patch.git
           
-          # 复制补丁和文件
           cp ./susfs4ksu/kernel_patches/50_add_susfs_in_gki-${ANDROID_VERSION}-${KERNEL_VERSION}.patch ./common/
           cp ./susfs4ksu/kernel_patches/fs/* ./common/fs/
           cp ./susfs4ksu/kernel_patches/include/linux/* ./common/include/linux/
@@ -307,26 +300,23 @@ jobs:
           
           cd ./common          
           patch -p1 < 50_add_susfs_in_gki-${ANDROID_VERSION}-${KERNEL_VERSION}.patch || true
-          # 天玑6991机型修复task_mmu.c编译错误
           if [[ $CHIPSET == mt6991 ]]; then
               sed -i 's|vma = find_vma(mm|struct vm_area_struct *&|' ./fs/proc/task_mmu.c
           fi
           patch -p1 < 69_hide_stuff.patch || true
           
-          # 清理补丁文件
           rm -f 50_add_susfs_in_gki-${ANDROID_VERSION}-${KERNEL_VERSION}.patch 69_hide_stuff.patch
           rm -rf ../susfs4ksu ../SukiSU_patch
         if: contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
+
 
       - name: 设置编译配置
         run: |
           cd kernel_workspace
           echo "CONFIG_KSU=y" >> ./common/arch/arm64/configs/gki_defconfig
           
-          # KPM配置
           echo "CONFIG_KPM=y" >> ./common/arch/arm64/configs/gki_defconfig
-          
-          # SUSFS配置
+                    
           echo "CONFIG_KSU_SUSFS=y" >> ./common/arch/arm64/configs/gki_defconfig
           echo "CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y" >> ./common/arch/arm64/configs/gki_defconfig
           echo "CONFIG_KSU_SUSFS_SUS_PATH=y" >> ./common/arch/arm64/configs/gki_defconfig
@@ -352,12 +342,11 @@ jobs:
            echo "CONFIG_MQ_IOSCHED_ADIOS=y" >> ./common/arch/arm64/configs/gki_defconfig
            echo "CONFIG_MQ_IOSCHED_DEFAULT_ADIOS=y" >> ./common/arch/arm64/configs/gki_defconfig
           fi
-          # Mountify支持
+          
           echo "CONFIG_TMPFS_XATTR=y" >> ./common/arch/arm64/configs/gki_defconfig
           echo "CONFIG_TMPFS_POSIX_ACL=y" >> ./common/arch/arm64/configs/gki_defconfig
           echo "CONFIG_TMPFS=y" >> ./common/arch/arm64/configs/gki_defconfig
           
-          # 编译优化
           echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y" >> ./common/arch/arm64/configs/gki_defconfig
           echo "CONFIG_HEADERS_INSTALL=n" >> ./common/arch/arm64/configs/gki_defconfig
           sudo sed -i 's/check_defconfig//' ./common/build.config.gki
@@ -372,23 +361,38 @@ jobs:
           sed -i 's/${scm_version}//' ./common/scripts/setlocalversion
         if: contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
 
-      - name: 构建内核
+      - name: 构建内核（修复工具链路径+ccache加速）
         run: |
           WORKDIR="$(pwd)"
           export PATH="/usr/lib/ccache:$PATH"
-          # 按内核版本配置工具链路径
+          
+          # 核心修复：修正工具链根路径，与克隆路径完全一致
+          CLANG_ROOT="$WORKDIR/kernel_workspace"
           if [[ $KERNEL_VERSION == 6.1.* ]]; then
-            export PATH="$WORKDIR/kernel_workspace/clang20/bin:$PATH"
-            CLANG_DIR="$WORKDIR/kernel_workspace/clang20/bin"
+            export CLANG_PATH="$CLANG_ROOT/clang20"
           else
-            export PATH="$WORKDIR/kernel_workspace/clang18/bin:$PATH"
-            CLANG_DIR="$WORKDIR/kernel_workspace/clang18/bin"
+            export CLANG_PATH="$CLANG_ROOT/clang18"
           fi
+          # 将工具链bin目录加入系统PATH
+          export PATH="$CLANG_PATH/bin:$PATH"
           export PATH="$WORKDIR/kernel_workspace/build-tools/bin:$PATH"
           
+          # 验证工具链可执行文件是否存在
+          echo "验证工具链路径：$CLANG_PATH/bin"
+          if [ ! -f "$CLANG_PATH/bin/clang" ]; then
+            echo "❌ clang不存在，路径：$CLANG_PATH/bin/clang"
+            ls -la "$CLANG_PATH/bin/"
+            exit 1
+          fi
+          if [ ! -f "$CLANG_PATH/bin/ld.lld" ]; then
+            echo "❌ ld.lld不存在，路径：$CLANG_PATH/bin/ld.lld"
+            ls -la "$CLANG_PATH/bin/"
+            exit 1
+          fi
+          
           # 编译器信息输出
-          CLANG_VERSION="$($CLANG_DIR/clang --version | head -n 1)"
-          LLD_VERSION="$($CLANG_DIR/ld.lld --version | head -n 1)"
+          CLANG_VERSION="$($CLANG_PATH/bin/clang --version | head -n 1)"
+          LLD_VERSION="$($CLANG_PATH/bin/ld.lld --version | head -n 1)"
           echo "编译器信息:"
           echo "Clang版本: $CLANG_VERSION"
           echo "LLD版本: $LLD_VERSION"
@@ -401,11 +405,10 @@ jobs:
           export CCACHE_NOHASHDIR="true"
           export CCACHE_HARDLINK="true"
           export CCACHE_DIR="${{ env.CCACHE_DIR }}"
-          export CCACHE_MAXSIZE="8G"
+          export CCACHE_MAXSIZE="3G"
           echo "sloppiness = file_stat_matches,include_file_ctime,include_file_mtime,pch_defines,file_macro,time_macros" >> "$CCACHE_DIR/ccache.conf"
           
           cd kernel_workspace/common
-          # 移除原有的libfakestat.so/libfaketimeMT.so下载和LD_PRELOAD配置
           
           # 处理内核构建时间
           INPUT_TIME="${{ env.KERNEL_TIME }}"
@@ -416,7 +419,6 @@ jobs:
             DATESTR="$(TZ='UTC' date +'%a %b %d %T %Z %Y')"
             echo "⚠️  未获取到官方时间，fallback到UTC当前时间: $DATESTR"
           fi
-          # 修改内核mkcompile_h文件
           for mkcompile_h_path in \
             "$WORKDIR/kernel_workspace/common/scripts/mkcompile_h"
           do
@@ -430,15 +432,15 @@ jobs:
             fi
           done
           
-          # 清理空间（保留原有逻辑）
+          # 清理空间
           sudo rm -rf /usr/share/dotnet &
           sudo rm -rf /usr/local/lib/android &
           sudo rm -rf /opt/ghc &
           sudo rm -rf /opt/hostedtoolcache/CodeQL &
           
-          # 编译命令（使用ccache加速，移除cc-wrapper/ld-wrapper）
-          make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" LD="ld.lld" HOSTLD=ld.lld O=out KCFLAGS+=-O2 KCFLAGS+=-Wno-error gki_defconfig &&
-          make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" LD="ld.lld" HOSTLD=ld.lld O=out KCFLAGS+=-O2 KCFLAGS+=-Wno-error Image
+          # 核心修复：使用工具链绝对路径调用编译器，确保ccache生效
+          make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache $CLANG_PATH/bin/clang" LD="$CLANG_PATH/bin/ld.lld" HOSTLD="$CLANG_PATH/bin/ld.lld" O=out KCFLAGS+=-O2 KCFLAGS+=-Wno-error gki_defconfig &&
+          make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache $CLANG_PATH/bin/clang" LD="$CLANG_PATH/bin/ld.lld" HOSTLD="$CLANG_PATH/bin/ld.lld" O=out KCFLAGS+=-O2 KCFLAGS+=-Wno-error Image
           
           # 输出ccache状态
           echo "内核编译完成！"
@@ -454,18 +456,18 @@ jobs:
           rm -rf ./AnyKernel3/.git
           mkdir -p kernel_workspace/out/Final-Image-Find/
           
-          # 查找Image文件
-          image_path=$(find "./kernel_workspace/common/out/" -name "Image" | head -n 1)
+          # 优化：递归查找Image文件，扩大搜索范围
+          image_path=$(find "./kernel_workspace/common/out/" -type f -name "Image" -print -quit)
           if [ -z "$image_path" ]; then
-            echo "未找到Image文件，构建失败" >&2
+            echo "❌ 未找到Image文件，构建失败"
+            # 输出目录结构，便于排查
+            ls -la ./kernel_workspace/common/out/
             exit 1
           fi
           
-          # 复制Image
           cp "$image_path" ./AnyKernel3/Image
           cp "$image_path" kernel_workspace/out/Final-Image-Find/Image
           
-          # 骁龙8750处理器额外复制dtbo/system_dlkm
           if [[ "${{ env.CHIPSET }}" == "sm8750" ]]; then
             dir2=$(dirname "$image_path")/
             for file in dtbo.img system_dlkm.erofs.img; do
