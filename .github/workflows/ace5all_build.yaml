@@ -309,6 +309,37 @@ jobs:
           rm -rf ../susfs4ksu ../SukiSU_patch
         if: contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
 
+      - name: Apply UNICODE_BYPASS and MEMORY_OPT
+        run: |
+          cd kernel_workspace
+          # 克隆你的补丁仓库（skk0042/sm8750，main分支）
+          if [ ! -d "sm8750_patches" ]; then
+            git clone https://github.com/skk0042/sm8750.git --depth=1 --branch main sm8750_patches
+          fi
+          # 指向你仓库的patches目录
+          PATCH_DIR="${GITHUB_WORKSPACE}/kernel_workspace/sm8750_patches/patches"
+          cd common
+          
+          # 应用文件2的内存优化补丁（按文件2补丁名）
+          patch -p1 --forward < "${PATCH_DIR}/optimized_mem_operations.patch" || echo "optimized_mem_operations.patch 已应用/不兼容"
+          patch -p1 --forward < "${PATCH_DIR}/file_struct_8bytes_align.patch" || echo "file_struct_8bytes_align.patch 已应用/不兼容（适配你仓库的file_struct_bytes_align.patch）"
+          patch -p1 --forward < "${PATCH_DIR}/reduce_cache_pressure.patch" || echo "reduce_cache_pressure.patch 已应用/不兼容"
+          
+          # 按内核主版本选择Unicode补丁（文件2逻辑）
+          KERNEL_MAJOR=$(echo "${{ env.KERNEL_VERSION }}" | cut -d. -f1)
+          if [[ "$KERNEL_MAJOR" -lt 6 ]]; then
+            patch -p1 --forward < "${PATCH_DIR}/clear_page_16bytes_align.patch" || echo "clear_page_16bytes_align.patch 已应用/不兼容"
+            patch -p1 --forward < "${PATCH_DIR}/unicode_bypass_fix_6.1-.patch" || echo "unicode_bypass_fix_6.1-.patch 已应用/不兼容"
+          else
+            # 高版本内核符号适配（文件2核心逻辑）
+            cat "${PATCH_DIR}/clear_page_16bytes_align.patch" | sed -e 's/SYM_FUNC_START_PI(clear_page)/SYM_FUNC_START_PI(__pi_clear_page)/' | patch -p1 -F3 --forward || echo "clear_page_16bytes_align.patch 符号适配后已应用/不兼容"
+            patch -p1 --forward < "${PATCH_DIR}/unicode_bypass_fix_6.1+.patch" || echo "unicode_bypass_fix_6.1+.patch 已应用/不兼容"
+          fi
+          
+          # 清理临时仓库
+          cd ../..
+          rm -rf ./sm8750_patches
+        if: contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
 
       - name: 设置编译配置
         run: |
@@ -361,7 +392,7 @@ jobs:
           sed -i 's/${scm_version}//' ./common/scripts/setlocalversion
         if: contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
 
-      - name: 构建内核（修复工具链路径+ccache加速）
+      - name: 构建内核
         run: |
           WORKDIR="$(pwd)"
           export PATH="/usr/lib/ccache:$PATH"
