@@ -152,7 +152,6 @@ jobs:
             aria2c -s16 -x16 -k1M https://github.com/cctv18/oneplus_sm8650_toolchain/releases/download/LLVM-Clang20-r547379/clang-r547379.zip -o clang.zip &&
             unzip -q clang.zip -d clang20 && rm -rf clang.zip
             echo "CLANG_DIR=clang20/bin" >> $GITHUB_ENV
-            # 新增：验证clang20工具链是否解压成功
             if [ ! -f "clang20/bin/clang" ] || [ ! -f "clang20/bin/ld.lld" ]; then
               echo "❌ clang20工具链解压失败，文件缺失"
               ls -la clang20/bin/
@@ -163,7 +162,6 @@ jobs:
             aria2c -s16 -x16 -k1M https://github.com/cctv18/oneplus_sm8650_toolchain/releases/download/LLVM-Clang18-r510928/clang-r510928.zip -o clang.zip &&
             unzip -q clang.zip -d clang18 && rm -rf clang.zip
             echo "CLANG_DIR=clang18/bin" >> $GITHUB_ENV
-            # 新增：验证clang18工具链是否解压成功
             if [ ! -f "clang18/bin/clang" ] || [ ! -f "clang18/bin/ld.lld" ]; then
               echo "❌ clang18工具链解压失败，文件缺失"
               ls -la clang18/bin/
@@ -182,7 +180,7 @@ jobs:
           done
         if: contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
 
-      - name: 配置 ccache（按处理器区分缓存目录）
+      - name: 配置 ccache
         run: |
           echo "CCACHE_DIR=$HOME/.ccache_${{ env.DEVICES_NAME }}" >> $GITHUB_ENV
           echo "CCACHE_MAXSIZE=8G" >> $GITHUB_ENV
@@ -227,11 +225,11 @@ jobs:
       - name: 添加 lz4 1.10.0 & zstd 1.5.7补丁
         run: |
           cd kernel_workspace
-          echo "正在添加压缩补丁（${CHIPSET}处理器适配）..."
+          echo "正在添加压缩补丁"
           if [[ $CHIPSET == sm8750 || $CHIPSET == mt6991 ]]; then
-            git clone https://github.com/cctv18/oppo_oplus_realme_sm8750.git patch_repo
+            git clone --depth= https://github.com/cctv18/oppo_oplus_realme_sm8750.git patch_repo
           else
-            git clone https://github.com/cctv18/oppo_oplus_realme_sm8650.git patch_repo
+            git clone --depth= https://github.com/cctv18/oppo_oplus_realme_sm8650.git patch_repo
           fi
           
           cp ./patch_repo/zram_patch/001-lz4.patch ./common
@@ -244,7 +242,7 @@ jobs:
           
           cd ./common
           git apply -p1 < 001-lz4.patch || true
-          if [[ $CHIPSET == mt69* ]]; then
+          if [[ $CHIPSET == mt6991 ]]; then
             git apply -p1 < 001-lz4-clearMake.patch || true
           fi
           patch -p1 < 002-zstd.patch || true
@@ -289,14 +287,12 @@ jobs:
       - name: 配置 SUSFS
         run: |
           cd kernel_workspace
-          echo "正在添加SUSFS补丁（${KERNEL_VERSION}内核适配）..."
-          git clone https://github.com/ShirkNeko/susfs4ksu.git -b gki-${ANDROID_VERSION}-${KERNEL_VERSION}
-          git clone https://github.com/ShirkNeko/SukiSU_patch.git
-          
+          echo "正在添加SUSFS补丁"
+          git clone --depth=1 https://gitlab.com/simonpunk/susfs4ksu.git -b gki-${ANDROID_VERSION}-${KERNEL_VERSION}
+          wget https://github.com/cctv18/oppo_oplus_realme_sm8750/raw/refs/heads/main/other_patch/69_hide_stuff.patch -O ./common/69_hide_stuff.patch
           cp ./susfs4ksu/kernel_patches/50_add_susfs_in_gki-${ANDROID_VERSION}-${KERNEL_VERSION}.patch ./common/
           cp ./susfs4ksu/kernel_patches/fs/* ./common/fs/
           cp ./susfs4ksu/kernel_patches/include/linux/* ./common/include/linux/
-          cp ./SukiSU_patch/69_hide_stuff.patch ./common/
           
           cd ./common          
           patch -p1 < 50_add_susfs_in_gki-${ANDROID_VERSION}-${KERNEL_VERSION}.patch || true
@@ -304,39 +300,30 @@ jobs:
               sed -i 's|vma = find_vma(mm|struct vm_area_struct *&|' ./fs/proc/task_mmu.c
           fi
           patch -p1 < 69_hide_stuff.patch || true
-          
-          rm -f 50_add_susfs_in_gki-${ANDROID_VERSION}-${KERNEL_VERSION}.patch 69_hide_stuff.patch
-          rm -rf ../susfs4ksu ../SukiSU_patch
         if: contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
 
-      - name: Apply UNICODE_BYPASS and MEMORY_OPT
+      - name: 解决零宽字符漏洞
         run: |
           cd kernel_workspace
-          # 克隆你的补丁仓库（skk0042/sm8750，main分支）
           if [ ! -d "sm8750_patches" ]; then
             git clone https://github.com/skk0042/sm8750.git --depth=1 --branch main sm8750_patches
           fi
-          # 指向你仓库的patches目录
           PATCH_DIR="${GITHUB_WORKSPACE}/kernel_workspace/sm8750_patches/patches"
           cd common
           
-          # 应用文件2的内存优化补丁（按文件2补丁名）
-          patch -p1 --forward < "${PATCH_DIR}/optimized_mem_operations.patch" || echo "optimized_mem_operations.patch 已应用/不兼容"
-          patch -p1 --forward < "${PATCH_DIR}/file_struct_8bytes_align.patch" || echo "file_struct_8bytes_align.patch 已应用/不兼容（适配你仓库的file_struct_bytes_align.patch）"
-          patch -p1 --forward < "${PATCH_DIR}/reduce_cache_pressure.patch" || echo "reduce_cache_pressure.patch 已应用/不兼容"
+          patch -p1 --forward < "${PATCH_DIR}/optimized_mem_operations.patch" || echo "optimized_mem_operations.patch 已应用"
+          patch -p1 --forward < "${PATCH_DIR}/file_struct_8bytes_align.patch" || echo "file_struct_8bytes_align.patch 已应用"
+          patch -p1 --forward < "${PATCH_DIR}/reduce_cache_pressure.patch" || echo "reduce_cache_pressure.patch 已应用"
           
-          # 按内核主版本选择Unicode补丁（文件2逻辑）
           KERNEL_MAJOR=$(echo "${{ env.KERNEL_VERSION }}" | cut -d. -f1)
           if [[ "$KERNEL_MAJOR" -lt 6 ]]; then
-            patch -p1 --forward < "${PATCH_DIR}/clear_page_16bytes_align.patch" || echo "clear_page_16bytes_align.patch 已应用/不兼容"
-            patch -p1 --forward < "${PATCH_DIR}/unicode_bypass_fix_6.1-.patch" || echo "unicode_bypass_fix_6.1-.patch 已应用/不兼容"
+            patch -p1 --forward < "${PATCH_DIR}/clear_page_16bytes_align.patch" || echo "clear_page_16bytes_align.patch 已应用"
+            patch -p1 --forward < "${PATCH_DIR}/unicode_bypass_fix_6.1-.patch" || echo "unicode_bypass_fix_6.1-.patch 已应用"
           else
-            # 高版本内核符号适配（文件2核心逻辑）
-            cat "${PATCH_DIR}/clear_page_16bytes_align.patch" | sed -e 's/SYM_FUNC_START_PI(clear_page)/SYM_FUNC_START_PI(__pi_clear_page)/' | patch -p1 -F3 --forward || echo "clear_page_16bytes_align.patch 符号适配后已应用/不兼容"
-            patch -p1 --forward < "${PATCH_DIR}/unicode_bypass_fix_6.1+.patch" || echo "unicode_bypass_fix_6.1+.patch 已应用/不兼容"
+            cat "${PATCH_DIR}/clear_page_16bytes_align.patch" | sed -e 's/SYM_FUNC_START_PI(clear_page)/SYM_FUNC_START_PI(__pi_clear_page)/' | patch -p1 -F3 --forward || echo "clear_page_16bytes_align.patch 符号适配后已应用"
+            patch -p1 --forward < "${PATCH_DIR}/unicode_bypass_fix_6.1+.patch" || echo "unicode_bypass_fix_6.1+.patch 已应用"
           fi
           
-          # 清理临时仓库
           cd ../..
           rm -rf ./sm8750_patches
         if: contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
@@ -397,18 +384,15 @@ jobs:
           WORKDIR="$(pwd)"
           export PATH="/usr/lib/ccache:$PATH"
           
-          # 核心修复：修正工具链根路径，与克隆路径完全一致
           CLANG_ROOT="$WORKDIR/kernel_workspace"
           if [[ $KERNEL_VERSION == 6.1.* ]]; then
             export CLANG_PATH="$CLANG_ROOT/clang20"
           else
             export CLANG_PATH="$CLANG_ROOT/clang18"
           fi
-          # 将工具链bin目录加入系统PATH
           export PATH="$CLANG_PATH/bin:$PATH"
           export PATH="$WORKDIR/kernel_workspace/build-tools/bin:$PATH"
           
-          # 验证工具链可执行文件是否存在
           echo "验证工具链路径：$CLANG_PATH/bin"
           if [ ! -f "$CLANG_PATH/bin/clang" ]; then
             echo "❌ clang不存在，路径：$CLANG_PATH/bin/clang"
@@ -421,7 +405,6 @@ jobs:
             exit 1
           fi
           
-          # 编译器信息输出
           CLANG_VERSION="$($CLANG_PATH/bin/clang --version | head -n 1)"
           LLD_VERSION="$($CLANG_PATH/bin/ld.lld --version | head -n 1)"
           echo "编译器信息:"
@@ -429,19 +412,17 @@ jobs:
           echo "LLD版本: $LLD_VERSION"
           pahole_version=$(pahole --version 2>/dev/null | head -n1); [ -z "$pahole_version" ] && echo "pahole版本：未安装" || echo "pahole版本：$pahole_version"
           
-          # ccache环境配置
           export CCACHE_LOGFILE="${{ github.workspace }}/kernel_workspace/ccache.log"
           export CCACHE_COMPILERCHECK="none"
           export CCACHE_BASEDIR="${{ github.workspace }}"
           export CCACHE_NOHASHDIR="true"
           export CCACHE_HARDLINK="true"
           export CCACHE_DIR="${{ env.CCACHE_DIR }}"
-          export CCACHE_MAXSIZE="3G"
+          export CCACHE_MAXSIZE="8G"
           echo "sloppiness = file_stat_matches,include_file_ctime,include_file_mtime,pch_defines,file_macro,time_macros" >> "$CCACHE_DIR/ccache.conf"
           
           cd kernel_workspace/common
           
-          # 处理内核构建时间
           INPUT_TIME="${{ env.KERNEL_TIME }}"
           if [[ -n "$INPUT_TIME" ]]; then
             DATESTR="$INPUT_TIME"
@@ -463,17 +444,14 @@ jobs:
             fi
           done
           
-          # 清理空间
           sudo rm -rf /usr/share/dotnet &
           sudo rm -rf /usr/local/lib/android &
           sudo rm -rf /opt/ghc &
           sudo rm -rf /opt/hostedtoolcache/CodeQL &
           
-          # 核心修复：使用工具链绝对路径调用编译器，确保ccache生效
           make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache $CLANG_PATH/bin/clang" LD="$CLANG_PATH/bin/ld.lld" HOSTLD="$CLANG_PATH/bin/ld.lld" O=out KCFLAGS+=-O2 KCFLAGS+=-Wno-error gki_defconfig &&
           make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache $CLANG_PATH/bin/clang" LD="$CLANG_PATH/bin/ld.lld" HOSTLD="$CLANG_PATH/bin/ld.lld" O=out KCFLAGS+=-O2 KCFLAGS+=-Wno-error Image
           
-          # 输出ccache状态
           echo "内核编译完成！"
           echo "ccache状态："
           ccache -s
@@ -487,11 +465,9 @@ jobs:
           rm -rf ./AnyKernel3/.git
           mkdir -p kernel_workspace/out/Final-Image-Find/
           
-          # 优化：递归查找Image文件，扩大搜索范围
           image_path=$(find "./kernel_workspace/common/out/" -type f -name "Image" -print -quit)
           if [ -z "$image_path" ]; then
             echo "❌ 未找到Image文件，构建失败"
-            # 输出目录结构，便于排查
             ls -la ./kernel_workspace/common/out/
             exit 1
           fi
