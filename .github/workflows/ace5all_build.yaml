@@ -302,13 +302,6 @@ jobs:
           patch -p1 < 69_hide_stuff.patch || true
         if: contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
 
-      - name: 配置 SuKiSU Ultra
-        run: |
-          cd kernel_workspace
-          echo "正在配置hymo"
-curl -LSs https://raw.githubusercontent.com/Anatdx/HymoFS/main/setup.sh | bash -s defconfig arch/arm64/configs/gki_defconfig
-        if: contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
-
       - name: 解决零宽字符漏洞
         run: |
           cd kernel_workspace
