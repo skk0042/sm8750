@@ -339,6 +339,17 @@ jobs:
           
           echo "CONFIG_HYMOFS=y" >> ./arch/arm64/configs/gki_defconfig
         if: contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
+      - name: 针对sm8650修复Kconfig引用（解决找不到kernel/oplus_cpu/sched/Kconfig）
+        run: |
+         cd kernel_workspace/common
+         if [[ "${{ env.CHIPSET }}" == "sm8650" ]]; then
+          echo "✅ 检测到sm8650机型，修复init/Kconfig中的错误引用"
+          sed -i '877s/^source/# source/' init/Kconfig
+          echo "已注释init/Kconfig第877行：# source \"kernel/oplus_cpu/sched/Kconfig\""
+         else
+          echo "当前机型不是sm8650，跳过Kconfig修复"
+         fi
+        if: contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
         
       - name: 设置编译配置
         run: |
