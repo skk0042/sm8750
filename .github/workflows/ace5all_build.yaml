@@ -550,6 +550,6 @@ jobs:
       - name: 上传 Anykernel3
         uses: actions/upload-artifact@v4
         with:
-          name: @486_SukiSU_${{ env.CHIPSET }}
+          name: SukiSU_${{ env.CHIPSET }}
           path: ./AnyKernel3/*
         if: contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
