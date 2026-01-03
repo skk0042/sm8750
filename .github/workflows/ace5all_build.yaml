@@ -1,4 +1,4 @@
-name: Batch_building
+name: Batch_Build_oneplus_kernel
 on:
   workflow_dispatch:
     inputs:
@@ -16,10 +16,9 @@ on:
         required: false
         default: ''
       custom_kernel_time:
-        description: "自定义构建时间（格式：Tue Jul  1 19:48:18 UTC 2025）"
+        description: "自定义构建时间- 仅在取消勾选'保持原设置'时有效"
         required: false
         default: ''
-
 jobs:
   batch_build:
     name: Build_${{ matrix.DEVICE }}
@@ -37,7 +36,6 @@ jobs:
       KEEP_ORIGINAL_SETTINGS: ${{ github.event.inputs.keep_original_settings }}
       CUSTOM_KERNEL_SUFFIX:   ${{ github.event.inputs.custom_kernel_suffix }}
       CUSTOM_KERNEL_TIME:     ${{ github.event.inputs.custom_kernel_time }}
-      ENABLE_FENGCHI:         ${{ github.event.inputs.enable_fengchi }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -45,7 +43,7 @@ jobs:
           fetch-depth: 0
         if: contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
 
-      - name: 先前配置
+      - name: 处理器型号配置
         run: |
           case "${{ env.DEVICES_NAME }}" in
             oneplus_sm8750)
@@ -69,7 +67,6 @@ jobs:
               echo "KERNEL_VERSION=6.1" >> $GITHUB_ENV
               ;;
           esac
-
           if [ "${{ env.KEEP_ORIGINAL_SETTINGS }}" = "true" ] && [ -z "${{ github.event.inputs.custom_kernel_suffix }}" ]; then
             case "${{ env.DEVICES_NAME }}" in
               oneplus_sm8750)
@@ -90,11 +87,10 @@ jobs:
             echo "使用自定义名称: ${{ github.event.inputs.custom_kernel_suffix }}"
             echo "DEFAULT_SUFFIX=${{ github.event.inputs.custom_kernel_suffix }}" >> $GITHUB_ENV
           fi
-
           if [ "${{ env.KEEP_ORIGINAL_SETTINGS }}" = "true" ] && [ -z "${{ github.event.inputs.custom_kernel_time }}" ]; then
             case "${{ env.DEVICES_NAME }}" in
               oneplus_sm8750)
-                echo 'KERNEL_TIME=Thu Nov 13 00:02:51 CST 2025' >> $GITHUB_ENV
+                echo 'KERNEL_TIME=Tue Jul  1 19:48:18 UTC 2025' >> $GITHUB_ENV
                 ;;
               oneplus_sm8650)
                 echo 'KERNEL_TIME=Fri Sep 19 06:13:40 UTC 2025' >> $GITHUB_ENV
@@ -103,7 +99,7 @@ jobs:
                 echo 'KERNEL_TIME=Tue Jun 10 12:12:23 UTC 2025' >> $GITHUB_ENV
                 ;;
               oneplus_mt6989)
-                echo 'KERNEL_TIME=Thu Nov 13 00:02:51 CST 2025' >> $GITHUB_ENV
+                echo 'KERNEL_TIME=Tue Jul  1 19:48:18 UTC 2025' >> $GITHUB_ENV
                 ;;
             esac
             echo "使用官核默认时间: ${{ env.KERNEL_TIME }}"
@@ -124,50 +120,59 @@ jobs:
           sudo rm -rf /var/lib/man-db/auto-update &&
           sudo apt update &&
           sudo apt-get install -y --no-install-recommends binutils python-is-python3 libssl-dev libelf-dev dos2unix ccache p7zip-full aria2
-
+          
           echo "正在克隆 ${CHIPSET} 处理器的内核源码..."
           case "${{ env.CHIPSET }}" in
             sm8750)
-              aria2c -s16 -x16 -k1M https://github.com/OnePlusOSS/android_kernel_common_oneplus_sm8750/archive/refs/heads/oneplus/sm8750_b_16.0.0_ace_6.zip -o common.zip
+              aria2c -s16 -x16 -k1M https://github.com/cctv18/android_kernel_common_oneplus_sm8750/archive/refs/heads/oneplus/sm8750_v_16.0.0_oneplus_13_6.6.89.zip -o common.zip
               unzip -q common.zip && 
-              mv "android_kernel_common_oneplus_sm8750-oneplus-sm8750_b_16.0.0_ace_6" common
+              mv "android_kernel_common_oneplus_sm8750-oneplus-sm8750_v_16.0.0_oneplus_13_6.6.89" common
               ;;
             sm8650)
-              aria2c -s16 -x16 -k1M https://github.com/OnePlusOSS/android_kernel_common_oneplus_sm8650/archive/refs/heads/oneplus/sm8650_b_16.0.0_oneplus12.zip -o common.zip
+              aria2c -s16 -x16 -k1M https://github.com/cctv18/android_kernel_common_oneplus_sm8650/archive/refs/heads/oneplus/sm8650_v_15.0.0_oneplus12_6.1.118.zip -o common.zip
               unzip -q common.zip && 
-              mv "android_kernel_common_oneplus_sm8650-oneplus-sm8650_b_16.0.0_oneplus12" common
-              ;;
-            mt6991)
-              aria2c -s16 -x16 -k1M https://github.com/OnePlusOSS/android_kernel_oneplus_mt6991/archive/refs/heads/oneplus/mt6991_b_16.0.0_oneplus_ace5_ultra.zip -o common.zip
-              unzip -q common.zip && 
-              mv "android_kernel_oneplus_mt6991-oneplus-mt6991_b_16.0.0_oneplus_ace5_ultra" common
+              mv "android_kernel_common_oneplus_sm8650-oneplus-sm8650_v_15.0.0_oneplus12_6.1.118" common
               ;;
             mt6989)
-              aria2c -s16 -x16 -k1M https://github.com/OnePlusOSS/android_kernel_oneplus_mt6989/archive/refs/heads/oneplus/mt6989_b_16.0.0_ace5_race.zip -o common.zip
+              aria2c -s16 -x16 -k1M https://github.com/cctv18/android_kernel_oneplus_mt6989/archive/refs/heads/oneplus/mt6989_b_16.0.0_ace5_race.zip -o common.zip
               unzip -q common.zip && 
               mv "android_kernel_oneplus_mt6989-oneplus-mt6989_b_16.0.0_ace5_race" common
               ;;
+            mt6991)
+              aria2c -s16 -x16 -k1M https://github.com/cctv18/android_kernel_oneplus_mt6991/archive/refs/heads/oneplus/mt6991_v_15.0.2_ace5_ultra_6.6.89.zip -o common.zip
+              unzip -q common.zip && 
+              mv "android_kernel_oneplus_mt6991-oneplus-mt6991_v_15.0.2_ace5_ultra_6.6.89" common
+              ;;
           esac
           rm -rf common.zip 
-
+          
           echo "正在克隆工具链（${KERNEL_VERSION}内核适配）..."
-          if [[ $KERNEL_VERSION == 6.1 ]]; then
+          if [[ $KERNEL_VERSION == 6.1.* ]]; then
             mkdir -p clang20 &&
             aria2c -s16 -x16 -k1M https://github.com/cctv18/oneplus_sm8650_toolchain/releases/download/LLVM-Clang20-r547379/clang-r547379.zip -o clang.zip &&
             unzip -q clang.zip -d clang20 && rm -rf clang.zip
             echo "CLANG_DIR=clang20/bin" >> $GITHUB_ENV
+            if [ ! -f "clang20/bin/clang" ] || [ ! -f "clang20/bin/ld.lld" ]; then
+              echo "❌ clang20工具链解压失败，文件缺失"
+              ls -la clang20/bin/
+              exit 1
+            fi
           else
             mkdir -p clang18 &&
             aria2c -s16 -x16 -k1M https://github.com/cctv18/oneplus_sm8650_toolchain/releases/download/LLVM-Clang18-r510928/clang-r510928.zip -o clang.zip &&
             unzip -q clang.zip -d clang18 && rm -rf clang.zip
             echo "CLANG_DIR=clang18/bin" >> $GITHUB_ENV
+            if [ ! -f "clang18/bin/clang" ] || [ ! -f "clang18/bin/ld.lld" ]; then
+              echo "❌ clang18工具链解压失败，文件缺失"
+              ls -la clang18/bin/
+              exit 1
+            fi
           fi
-
+          
           aria2c -s16 -x16 -k1M https://github.com/cctv18/oneplus_sm8650_toolchain/releases/download/LLVM-Clang18-r510928/build-tools.zip -o build-tools.zip &&
           unzip -q build-tools.zip && rm -rf build-tools.zip &
           wait
-
-          echo "初始化源码环境..."
+          
           rm common/android/abi_gki_protected_exports_* || true
           for f in common/scripts/setlocalversion; do
             sed -i 's/ -dirty//g' "$f"
@@ -296,8 +301,13 @@ jobs:
           fi
           patch -p1 < 69_hide_stuff.patch || true
         if: contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
-        
 
+      - name: 开启BBG基带守护
+        run: |
+          cd kernel_workspace/common
+          echo "正在启用BBG基带守护…"
+          curl -LSs https://raw.githubusercontent.com/vc-teahouse/Baseband-guard/main/setup.sh | bash
+          sed -i '/^config LSM$/,/^help$/{ /^[[:space:]]*default/ { /baseband_guard/! s/lockdown/lockdown,baseband_guard/ } }' ./security/Kconfig
 
       - name: 解决零宽字符漏洞
         run: |
@@ -308,29 +318,17 @@ jobs:
           PATCH_DIR="${GITHUB_WORKSPACE}/kernel_workspace/sm8750_patches/patches"
           cd common
           
-          patch -p1 --forward < "${PATCH_DIR}/unicode_bypass_fix_6.1+.patch"
+           patch -p1 --forward < "${PATCH_DIR}/unicode_bypass_fix_6.1+.patch" || echo "unicode_bypass_fix_6.1+.patch 已应用"
         if: contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
         
-      - name: 添加 HymoFS
-        run: |
-          cd kernel_workspace/common
-          if [[ $KERNEL_VERSION == 6.1 ]]; then
-          cp ${{ github.workspace }}/patches/hymofs_with_susfs_6.1.patch .
-          patch -p1 -F 3 < hymofs_with_susfs_6.1.patch
-          else
-          cp ${{ github.workspace }}/patches/hymofs_with_susfs_6.6.patch .
-          patch -p1 -F 3 < hymofs_with_susfs_6.6.patch
-          fi
-          
-          echo "CONFIG_HYMOFS=y" >> ./arch/arm64/configs/gki_defconfig
-        if: contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
         
       - name: 设置编译配置
         run: |
           cd kernel_workspace
           echo "CONFIG_KSU=y" >> ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_KPM=y" >> ./common/arch/arm64/configs/gki_defconfig
           
+          echo "CONFIG_KPM=y" >> ./common/arch/arm64/configs/gki_defconfig
+                    
           echo "CONFIG_KSU_SUSFS=y" >> ./common/arch/arm64/configs/gki_defconfig
           echo "CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y" >> ./common/arch/arm64/configs/gki_defconfig
           echo "CONFIG_KSU_SUSFS_SUS_PATH=y" >> ./common/arch/arm64/configs/gki_defconfig
@@ -347,30 +345,43 @@ jobs:
           echo "CONFIG_KSU_SUSFS_OPEN_REDIRECT=y" >> ./common/arch/arm64/configs/gki_defconfig
           echo "CONFIG_KSU_SUSFS_SUS_MAP=y" >> ./common/arch/arm64/configs/gki_defconfig
           
-            echo "CONFIG_BPF_STREAM_PARSER=y" >> ./common/arch/arm64/configs/gki_defconfig
-            echo "CONFIG_NETFILTER_XT_MATCH_ADDRTYPE=y" >> ./common/arch/arm64/configs/gki_defconfig
-            echo "CONFIG_NETFILTER_XT_SET=y" >> ./common/arch/arm64/configs/gki_defconfig
-            echo "CONFIG_IP_SET=y" >> ./common/arch/arm64/configs/gki_defconfig
-            echo "CONFIG_IP_SET_MAX=65534" >> ./common/arch/arm64/configs/gki_defconfig
-            echo "CONFIG_IP_SET_BITMAP_IP=y" >> ./common/arch/arm64/configs/gki_defconfig
-            echo "CONFIG_IP_SET_BITMAP_IPMAC=y" >> ./common/arch/arm64/configs/gki_defconfig
-            echo "CONFIG_IP_SET_BITMAP_PORT=y" >> ./common/arch/arm64/configs/gki_defconfig
-            echo "CONFIG_IP_SET_HASH_IP=y" >> ./common/arch/arm64/configs/gki_defconfig
-            echo "CONFIG_IP_SET_HASH_IPMARK=y" >> ./common/arch/arm64/configs/gki_defconfig
-            echo "CONFIG_IP_SET_HASH_IPPORT=y" >> ./common/arch/arm64/configs/gki_defconfig
-            echo "CONFIG_IP_SET_HASH_IPPORTIP=y" >> ./common/arch/arm64/configs/gki_defconfig
-            echo "CONFIG_IP_SET_HASH_IPPORTNET=y" >> ./common/arch/arm64/configs/gki_defconfig
-            echo "CONFIG_IP_SET_HASH_IPMAC=y" >> ./common/arch/arm64/configs/gki_defconfig
-            echo "CONFIG_IP_SET_HASH_MAC=y" >> ./common/arch/arm64/configs/gki_defconfig
-            echo "CONFIG_IP_SET_HASH_NETPORTNET=y" >> ./common/arch/arm64/configs/gki_defconfig
-            echo "CONFIG_IP_SET_HASH_NET=y" >> ./common/arch/arm64/configs/gki_defconfig
-            echo "CONFIG_IP_SET_HASH_NETNET=y" >> ./common/arch/arm64/configs/gki_defconfig
-            echo "CONFIG_IP_SET_HASH_NETPORT=y" >> ./common/arch/arm64/configs/gki_defconfig
-            echo "CONFIG_IP_SET_HASH_NETIFACE=y" >> ./common/arch/arm64/configs/gki_defconfig
-            echo "CONFIG_IP_SET_LIST_SET=y" >> ./common/arch/arm64/configs/gki_defconfig
-            echo "CONFIG_IP6_NF_NAT=y" >> ./common/arch/arm64/configs/gki_defconfig
-            echo "CONFIG_IP6_NF_TARGET_MASQUERADE=y" >> ./common/arch/arm64/configs/gki_defconfig
-          
+          echo "CONFIG_BPF_STREAM_PARSER=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_BPF_STREAM_PARSER=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_NETFILTER_XT_MATCH_ADDRTYPE=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_NETFILTER_XT_SET=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_IP_SET=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_IP_SET_MAX=65534" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_IP_SET_BITMAP_IP=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_IP_SET_BITMAP_IPMAC=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_IP_SET_BITMAP_PORT=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_IP_SET_HASH_IP=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_IP_SET_HASH_IPMARK=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_IP_SET_HASH_IPPORT=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_IP_SET_HASH_IPPORTIP=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_IP_SET_HASH_IPPORTNET=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_IP_SET_HASH_IPMAC=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_IP_SET_HASH_MAC=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_IP_SET_HASH_NETPORTNET=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_IP_SET_HASH_NET=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_IP_SET_HASH_NETNET=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_IP_SET_HASH_NETPORT=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_IP_SET_HASH_NETIFACE=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_IP_SET_LIST_SET=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_IP6_NF_NAT=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_IP6_NF_TARGET_MASQUERADE=y" >> ./common/arch/arm64/configs/gki_defconfig
+          cd common
+          wget https://github.com/cctv18/oppo_oplus_realme_sm8650/raw/refs/heads/main/other_patch/config.patch
+          patch -p1 -F 3 < config.patch || true
+                    
+          if [[ $KERNEL_VERSION == 6.1 ]]; then
+           echo "启用三星SSG IO调度器（6.1内核）"
+           echo "CONFIG_MQ_IOSCHED_SSG=y" >> ./common/arch/arm64/configs/gki_defconfig
+           echo "CONFIG_MQ_IOSCHED_SSG_CGROUP=y" >> ./common/arch/arm64/configs/gki_defconfig
+          else
+           echo "启用ADIOS IO调度器（6.6内核）"
+           echo "CONFIG_MQ_IOSCHED_ADIOS=y" >> ./common/arch/arm64/configs/gki_defconfig
+           echo "CONFIG_MQ_IOSCHED_DEFAULT_ADIOS=y" >> ./common/arch/arm64/configs/gki_defconfig
+          fi
           
           echo "CONFIG_TMPFS_XATTR=y" >> ./common/arch/arm64/configs/gki_defconfig
           echo "CONFIG_TMPFS_POSIX_ACL=y" >> ./common/arch/arm64/configs/gki_defconfig
@@ -381,52 +392,47 @@ jobs:
           sudo sed -i 's/check_defconfig//' ./common/build.config.gki
         if: contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
 
-      - name: 添加风驰驱动
+      - name: 设置内核后缀
         run: |
-          cd kernel_workspace/common
-            echo "✅ 启用风驰驱动，开始移植（当前芯片：${{ env.CHIPSET }}）"
-            case "${{ env.CHIPSET }}" in
-              sm8750)
-                DEVICE_FILE="oneplus_ace_6"
-                ;;
-              sm8650)
-                DEVICE_FILE="oneplus_12"
-                ;;
-              mt6991)
-                DEVICE_FILE="oneplus_ace5_ultra_b"
-                ;;
-              mt6989)
-                DEVICE_FILE="oneplus_ace5_race"
-                ;;
-              *)
-                echo "⚠️ 未支持当前芯片（${{ env.CHIPSET }}）的风驰驱动，跳过"
-                exit 0
-                ;;
-            esac
-            
-            git clone https://github.com/Numbersf/SCHED_PATCH.git -b ${{ env.CHIPSET }} || {
-              echo "❌ 风驰补丁仓库分支（${{ env.CHIPSET }}）不存在，跳过驱动移植"
-              exit 0
-            }
-            
-            FENGCHI_PATCH="SCHED_PATCH/fengchi_${DEVICE_FILE}.patch"
-            if [[ -f "$FENGCHI_PATCH" ]]; then
-              echo "📥 找到对应机型补丁：$FENGCHI_PATCH"
-              dos2unix "$FENGCHI_PATCH"
-              patch -p1 -F 3 < "$FENGCHI_PATCH" || echo "⚠️ 风驰补丁应用失败（可能与当前内核不兼容），跳过"
-              echo "✅ 风驰驱动移植完成（机型：${DEVICE_FILE}）"
-            else
-              echo "❌ 未找到 ${DEVICE_FILE} 的风驰补丁（${FENGCHI_PATCH}），跳过"
-            fi
-            rm -rf ./SCHED_PATCH
+          cd kernel_workspace
+          echo "内核后缀: $DEFAULT_SUFFIX"
+          ESCAPED_SUFFIX=$(printf '%s\n' "$DEFAULT_SUFFIX" | sed 's:[\/&]:\\&:g')
+          sudo sed -i "s/-4k/$ESCAPED_SUFFIX/g" ./common/arch/arm64/configs/gki_defconfig
+          sed -i 's/${scm_version}//' ./common/scripts/setlocalversion
         if: contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
 
       - name: 构建内核
         run: |
           WORKDIR="$(pwd)"
           export PATH="/usr/lib/ccache:$PATH"
-          export PATH="$WORKDIR/kernel_workspace/$CLANG_DIR:$PATH"
+          
+          CLANG_ROOT="$WORKDIR/kernel_workspace"
+          if [[ $KERNEL_VERSION == 6.1.* ]]; then
+            export CLANG_PATH="$CLANG_ROOT/clang20"
+          else
+            export CLANG_PATH="$CLANG_ROOT/clang18"
+          fi
+          export PATH="$CLANG_PATH/bin:$PATH"
           export PATH="$WORKDIR/kernel_workspace/build-tools/bin:$PATH"
+          
+          echo "验证工具链路径：$CLANG_PATH/bin"
+          if [ ! -f "$CLANG_PATH/bin/clang" ]; then
+            echo "❌ clang不存在，路径：$CLANG_PATH/bin/clang"
+            ls -la "$CLANG_PATH/bin/"
+            exit 1
+          fi
+          if [ ! -f "$CLANG_PATH/bin/ld.lld" ]; then
+            echo "❌ ld.lld不存在，路径：$CLANG_PATH/bin/ld.lld"
+            ls -la "$CLANG_PATH/bin/"
+            exit 1
+          fi
+          
+          CLANG_VERSION="$($CLANG_PATH/bin/clang --version | head -n 1)"
+          LLD_VERSION="$($CLANG_PATH/bin/ld.lld --version | head -n 1)"
+          echo "编译器信息:"
+          echo "Clang版本: $CLANG_VERSION"
+          echo "LLD版本: $LLD_VERSION"
+          pahole_version=$(pahole --version 2>/dev/null | head -n1); [ -z "$pahole_version" ] && echo "pahole版本：未安装" || echo "pahole版本：$pahole_version"
           
           export CCACHE_LOGFILE="${{ github.workspace }}/kernel_workspace/ccache.log"
           export CCACHE_COMPILERCHECK="none"
@@ -435,79 +441,43 @@ jobs:
           export CCACHE_HARDLINK="true"
           export CCACHE_DIR="${{ env.CCACHE_DIR }}"
           export CCACHE_MAXSIZE="8G"
-          echo "sloppiness = file_stat_matches,include_file_ctime,include_file_mtime,pch_defines,file_macro,time_macros" >> "$CCACHE_DIR/ccache.conf" 2>/dev/null || true
-
-          CLANG_DIR_FULL="$WORKDIR/kernel_workspace/$CLANG_DIR"
-          if [[ -d "$CLANG_DIR_FULL" ]]; then
-            CLANG_VERSION="$($CLANG_DIR_FULL/clang --version | head -n 1 || echo "未知版本")"
-            LLD_VERSION="$($CLANG_DIR_FULL/ld.lld --version | head -n 1 || echo "未知版本")"
-          else
-            CLANG_VERSION="编译器路径不存在"
-            LLD_VERSION="链接器路径不存在"
-          fi
-          pahole_version=$(pahole --version 2>/dev/null | head -n1); [ -z "$pahole_version" ] && pahole_version="未安装" || pahole_version="$pahole_version"
-          echo "📌 构建环境信息:"
-          echo "处理器型号: ${{ env.CHIPSET }}"
-          echo "内核版本: ${{ env.KERNEL_VERSION }}"
-          echo "Clang版本: $CLANG_VERSION"
-          echo "LLD版本: $LLD_VERSION"
-          echo "pahole版本：$pahole_version"
-          echo "构建时间: ${{ env.KERNEL_TIME }}"
-
+          echo "sloppiness = file_stat_matches,include_file_ctime,include_file_mtime,pch_defines,file_macro,time_macros" >> "$CCACHE_DIR/ccache.conf"
+          
+          cd kernel_workspace/common
+          
           INPUT_TIME="${{ env.KERNEL_TIME }}"
           if [[ -n "$INPUT_TIME" ]]; then
             DATESTR="$INPUT_TIME"
-            echo "✅ 已设置构建时间: $DATESTR"
+            echo "✅ 采用官方/自定义构建时间: $DATESTR"
           else
             DATESTR="$(TZ='UTC' date +'%a %b %d %T %Z %Y')"
-            echo "⚠️  未获取自定义时间，使用UTC当前时间: $DATESTR"
+            echo "⚠️  未获取到官方时间，fallback到UTC当前时间: $DATESTR"
           fi
-          export KBUILD_BUILD_TIMESTAMP="$DATESTR"
-          export KBUILD_BUILD_VERSION=1
-
-          cd "$WORKDIR/kernel_workspace/common"
-          echo '#!/bin/bash' > cc-wrapper && chmod +x cc-wrapper
-          echo 'ccache clang "$@"' >> cc-wrapper
-          echo '#!/bin/bash' > ld-wrapper && chmod +x ld-wrapper
-          echo 'ld.lld "$@"' >> ld-wrapper
-
-          if [[ ! -f "/swapfile" ]]; then
-            echo "🗑️ 创建3G Swap分区"
-            sudo swapoff -a
-            sudo fallocate -l 3G /swapfile
-            sudo chmod 600 /swapfile
-            sudo mkswap /swapfile
-            sudo swapon /swapfile
-            free -h | grep Swap
-          fi
-
-          echo "🗑️ 清理冗余文件"
+          for mkcompile_h_path in \
+            "$WORKDIR/kernel_workspace/common/scripts/mkcompile_h"
+          do
+            if [[ -f "$mkcompile_h_path" ]]; then
+              echo "🔧 修改mkcompile_h文件: $mkcompile_h_path"
+              perl -pi -e "s{UTS_VERSION=\"\\\$\\(.*?\\)\"}{UTS_VERSION=\"#1 SMP PREEMPT $DATESTR\"}" "$mkcompile_h_path"
+              if ! grep -q 'UTS_VERSION' "$mkcompile_h_path"; then
+                perl -0777 -pi -e "s{cat <<EOF}{cat <<EOF\n#undef UTS_VERSION\n#define UTS_VERSION \"#1 SMP PREEMPT $DATESTR\" }" "$mkcompile_h_path"
+              fi
+              break
+            fi
+          done
+          
           sudo rm -rf /usr/share/dotnet &
           sudo rm -rf /usr/local/lib/android &
           sudo rm -rf /opt/ghc &
           sudo rm -rf /opt/hostedtoolcache/CodeQL &
-          wait
-
-          echo "🚀 开始编译内核"
-          make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" LD="ld.lld" HOSTLD=ld.lld O=out KCFLAGS+=-O2 KCFLAGS+=-Wno-error gki_defconfig &&
-          make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="$(pwd)/cc-wrapper" LD="$(pwd)/ld-wrapper" HOSTLD=ld.lld O=out KCFLAGS+=-O2 KCFLAGS+=-Wno-error Image
-
-          echo "--- [校验] 编译结果 ---"
-          IMAGE_PATH=$(find ./out -name "Image" | head -n 1)
-          if [[ -z "$IMAGE_PATH" || ! -f "$IMAGE_PATH" ]]; then
-            echo "❌ 未找到内核镜像，构建失败" >&2
-            exit 1
-          else
-            echo "✅ 内核镜像路径: $IMAGE_PATH"
-            if strings "$IMAGE_PATH" | grep -q "$(echo $DATESTR | awk '{print $1,$2,$3}')"; then
-              echo "✅ 构建时间已成功写入内核"
-            fi
-          fi
-
-          echo "✅ 内核编译完成！"
-          echo "📊 ccache状态："
+          
+          make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache $CLANG_PATH/bin/clang" LD="$CLANG_PATH/bin/ld.lld" HOSTLD="$CLANG_PATH/bin/ld.lld" O=out KCFLAGS+=-O2 KCFLAGS+=-Wno-error gki_defconfig &&
+          make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache $CLANG_PATH/bin/clang" LD="$CLANG_PATH/bin/ld.lld" HOSTLD="$CLANG_PATH/bin/ld.lld" O=out KCFLAGS+=-O2 KCFLAGS+=-Wno-error Image
+          
+          echo "内核编译完成！"
+          echo "ccache状态："
           ccache -s
-          echo "💾 磁盘空间:"
+          echo "编译后空间:"
           df -h
         if: contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
 
@@ -517,9 +487,10 @@ jobs:
           rm -rf ./AnyKernel3/.git
           mkdir -p kernel_workspace/out/Final-Image-Find/
           
-          image_path=$(find "./kernel_workspace/common/out/" -name "Image" | head -n 1)
+          image_path=$(find "./kernel_workspace/common/out/" -type f -name "Image" -print -quit)
           if [ -z "$image_path" ]; then
-            echo "未找到Image文件，构建失败" >&2
+            echo "❌ 未找到Image文件，构建失败"
+            ls -la ./kernel_workspace/common/out/
             exit 1
           fi
           
@@ -541,6 +512,6 @@ jobs:
       - name: 上传 Anykernel3
         uses: actions/upload-artifact@v4
         with:
-          name: SukiSUUltra_${{ env.CHIPSET }}
+          name: SukiSU_Ultra_${{ env.KSUVER }}_${{ env.CHIPSET }}
           path: ./AnyKernel3/*
         if: contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
