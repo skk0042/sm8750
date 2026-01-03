@@ -49,26 +49,18 @@ jobs:
         run: |
           case "${{ env.DEVICES_NAME }}" in
             oneplus_sm8750)
-              echo "REPO_MANIFEST=sm8750_b_16.0.0_ace6" >> $GITHUB_ENV
-              echo "SCHED_FILE=oneplus_13_b" >> $GITHUB_ENV
               echo "CHIPSET=sm8750" >> $GITHUB_ENV
               echo "KERNEL_VERSION=6.6" >> $GITHUB_ENV
               ;;
             oneplus_sm8650)
-              echo "REPO_MANIFEST=sm8650_v_16.0.0_oneplus12" >> $GITHUB_ENV
-              echo "SCHED_FILE=oneplus_12_b" >> $GITHUB_ENV
               echo "CHIPSET=sm8650" >> $GITHUB_ENV
               echo "KERNEL_VERSION=6.1" >> $GITHUB_ENV
               ;;
             oneplus_mt6991)
-              echo "REPO_MANIFEST=mt6991_v_16.0.0_ace5_ultra" >> $GITHUB_ENV
-              echo "SCHED_FILE=oneplus_ace5_ultra" >> $GITHUB_ENV
               echo "CHIPSET=mt6991" >> $GITHUB_ENV
               echo "KERNEL_VERSION=6.6" >> $GITHUB_ENV
               ;;
             oneplus_mt6989)
-              echo "REPO_MANIFEST=mt6989_v_16.0.0_ace5_race" >> $GITHUB_ENV
-              echo "SCHED_FILE=oneplus_ace5_race" >> $GITHUB_ENV
               echo "CHIPSET=mt6989" >> $GITHUB_ENV
               echo "KERNEL_VERSION=6.1" >> $GITHUB_ENV
               ;;
@@ -132,24 +124,24 @@ jobs:
           echo "正在克隆 ${CHIPSET} 处理器的内核源码..."
           case "${{ env.CHIPSET }}" in
             sm8750)
-              aria2c -s16 -x16 -k1M https://github.com/OnePlusOSS/android_kernel_common_oneplus_sm8750/archive/refs/heads/oneplus/${REPO_MANIFEST}.zip -o common.zip
+              aria2c -s16 -x16 -k1M https://github.com/OnePlusOSS/android_kernel_common_oneplus_sm8750/archive/refs/heads/oneplus/sm8750_b_16.0.0_ace_6.zip -o common.zip
               unzip -q common.zip && 
-              mv "android_kernel_common_oneplus_sm8750-oneplus-${REPO_MANIFEST}" common
+              mv "android_kernel_common_oneplus_sm8750-oneplus-sm8750_b_16.0.0_ace_6" common
               ;;
             sm8650)
-              aria2c -s16 -x16 -k1M https://github.com/OnePlusOSS/android_kernel_common_oneplus_sm8650/archive/refs/heads/oneplus/${REPO_MANIFEST}.zip -o common.zip
+              aria2c -s16 -x16 -k1M https://github.com/OnePlusOSS/android_kernel_common_oneplus_sm8650/archive/refs/heads/oneplus/sm8650_b_16.0.0_oneplus12.zip -o common.zip
               unzip -q common.zip && 
-              mv "android_kernel_common_oneplus_sm8650-oneplus-${REPO_MANIFEST}" common
+              mv "android_kernel_common_oneplus_sm8650-oneplus-sm8650_b_16.0.0_oneplus12" common
               ;;
             mt6991)
-              aria2c -s16 -x16 -k1M https://github.com/OnePlusOSS/android_kernel_oneplus_mt6991/archive/refs/heads/oneplus/${REPO_MANIFEST}.zip -o common.zip
+              aria2c -s16 -x16 -k1M https://github.com/OnePlusOSS/android_kernel_oneplus_mt6991/archive/refs/heads/oneplus/mt6991_b_16.0.0_oneplus_ace5_ultra.zip -o common.zip
               unzip -q common.zip && 
-              mv "android_kernel_oneplus_mt6991-oneplus-${REPO_MANIFEST}" common
+              mv "android_kernel_oneplus_mt6991-oneplus-mt6991_b_16.0.0_oneplus_ace5_ultra" common
               ;;
             mt6989)
-              aria2c -s16 -x16 -k1M https://github.com/OnePlusOSS/android_kernel_oneplus_mt6989/archive/refs/heads/oneplus/${REPO_MANIFEST}.zip -o common.zip
+              aria2c -s16 -x16 -k1M https://github.com/OnePlusOSS/android_kernel_oneplus_mt6989/archive/refs/heads/oneplus/mt6989_b_16.0.0_ace5_race.zip -o common.zip
               unzip -q common.zip && 
-              mv "android_kernel_oneplus_mt6989-oneplus-${REPO_MANIFEST}" common
+              mv "android_kernel_oneplus_mt6989-oneplus-mt6989_b_16.0.0_ace5_race" common
               ;;
           esac
           rm -rf common.zip 
@@ -307,13 +299,13 @@ jobs:
             echo "✅ 启用风驰驱动，开始移植（当前芯片：${{ env.CHIPSET }}）"
             case "${{ env.CHIPSET }}" in
               sm8750)
-                DEVICE_FILE="oneplus_ace6"
+                DEVICE_FILE="oneplus_ace_6"
                 ;;
               sm8650)
                 DEVICE_FILE="oneplus_12"
                 ;;
               mt6991)
-                DEVICE_FILE="oneplus_ace5ultra"
+                DEVICE_FILE="oneplus_ace5_ultra_b"
                 ;;
               mt6989)
                 DEVICE_FILE="oneplus_ace5_race"
@@ -545,6 +537,6 @@ jobs:
       - name: 上传 Anykernel3
         uses: actions/upload-artifact@v4
         with:
-          name: SukiSU_${{ env.CHIPSET }}
+          name: SukiSUUltra_${{ env.CHIPSET }}
           path: ./AnyKernel3/*
         if: contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
