@@ -178,7 +178,7 @@ jobs:
 
       - name: 配置 ccache
         run: |
-          echo "CCACHE_DIR=$HOME/.ccache_${{ env..DEVICES_NAME }}" >> $GITHUB_ENV
+          echo "CCACHE_DIR=$HOME/.ccache_${{ env.DEVICES_NAME }}" >> $GITHUB_ENV
           echo "CCACHE_MAXSIZE=8G" >> $GITHUB_ENV
           echo "当前磁盘空间："
           df -h
