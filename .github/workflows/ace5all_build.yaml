@@ -308,9 +308,7 @@ jobs:
           PATCH_DIR="${GITHUB_WORKSPACE}/kernel_workspace/sm8750_patches/patches"
           cd common
           
-          patch -p1 < unicode_bypass_fix_6.1+.patch
-          cd ../..
-          rm -rf ./sm8750_patches
+          patch -p1 --forward < "${PATCH_DIR}/unicode_bypass_fix_6.1+.patch"
         if: contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
         
       - name: 添加 HymoFS
