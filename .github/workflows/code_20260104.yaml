@@ -406,109 +406,75 @@ jobs:
           rm -rf ./SCHED_PATCH
         if: contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
 
-      # ========== 移植文件2内核构建步骤（保留原构建时间功能） ==========
       - name: 构建内核（移植文件2逻辑+保留原构建时间）
         run: |
-          WORKDIR="$(pwd)"
-          export PATH="/usr/lib/ccache:$PATH"
-          
-          # 1. 保留原ccache配置
-          export CCACHE_LOGFILE="${{ github.workspace }}/kernel_workspace/ccache.log"
-          export CCACHE_COMPILERCHECK="none"
-          export CCACHE_BASEDIR="${{ github.workspace }}"
-          export CCACHE_NOHASHDIR="true"
-          export CCACHE_HARDLINK="true"
-          export CCACHE_DIR="${{ env.CCACHE_DIR }}"
-          export CCACHE_MAXSIZE="8G"
-          echo "sloppiness = file_stat_matches,include_file_ctime,include_file_mtime,pch_defines,file_macro,time_macros" >> "$CCACHE_DIR/ccache.conf" 2>/dev/null || true
+         WORKDIR="$(pwd)"
+         export PATH="/usr/lib/ccache:$PATH"
+         export CCACHE_LOGFILE="${{ github.workspace }}/kernel_workspace/ccache.log"
+         export CCACHE_COMPILERCHECK="none"
+         export CCACHE_BASEDIR="${{ github.workspace }}"
+         export CCACHE_NOHASHDIR="true"
+         export CCACHE_HARDLINK="true"
+         export CCACHE_DIR="${{ env.CCACHE_DIR }}"
+         export CCACHE_MAXSIZE="8G"
+         echo "sloppiness = file_stat_matches,include_file_ctime,include_file_mtime,pch_defines,file_macro,time_macros" >> "$CCACHE_DIR/ccache.conf" 2>/dev/null || true
 
-          # 2. 保留原构建时间功能（核心不修改）
-          INPUT_TIME="${{ env.KERNEL_TIME }}"
-          if [[ -n "$INPUT_TIME" ]]; then
-            DATESTR="$INPUT_TIME"
-            echo "✅ 已设置构建时间: $DATESTR"
-          else
-            DATESTR="$(TZ='UTC' date +'%a %b %d %T %Z %Y')"
-            echo "⚠️  未获取自定义时间，使用UTC当前时间: $DATESTR"
-          fi
-          export KBUILD_BUILD_TIMESTAMP="$DATESTR"
-          export KBUILD_BUILD_VERSION=1
-          
-          # 3. 移植文件2：：按内核版本设置编译器、RUSTC、PAHOLE路径
-          cd "$WORKDIR/kernel_workspace/common"
-          CLANG_PATH="$WORKDIR/kernel_workspace/$CLANG_DIR"
-          export PATH="$CLANG_PATH:$WORKDIR/kernel_workspace/build-tools:$PATH"
-          
-          # 安装依赖（文件2逻辑）
-          sudo apt install -y libelf-dev
-          
-          # 4. 保留原wrapper脚本
-          echo '#!/bin/bash' > cc-wrapper && chmod +x cc-wrapper
-          echo 'ccache clang "$@"' >> cc-wrapper
-          echo '#!/bin/bash' > ld-wrapper && chmod +x ld-wrapper
-          echo 'ld.lld "$@"' >> ld-wrapper
-          
-          # 5. 保留原Swap分区创建
-          if [[ ! -f "/swapfile" ]]; then
-            echo "🗑️ 创建3G Swap分区"
-            sudo swapoff -a
-            sudo fallocate -l 3G /swapfile
-            sudo chmod 600 /swapfile
-            sudo mkswap /swapfile
-            sudo swapon /swapfile
-            free -h | grep Swap
-          fi
-          
-          # 6. 保留原冗余文件清理
-          sudo rm -rf /usr/share/dotnet &
-          sudo rm -rf /usr/local/lib/android &
-          sudo rm -rf /opt/ghc &
-          sudo rm -rf /opt/hostedtoolcache/CodeQL &
-          wait
-          
-          # 7. 移植文件2：分内核版本编译（适配文件1路径）
-          echo "🚀 开始编译内核（版本：${{ env.KERNEL_VERSION }}）"
-          if [[ "${{ env.KERNEL_VERSION }}" == "6.1" ]]; then
-            # 6.1内核：文件2逻辑+文件1路径适配
-            make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- \
-              CC="ccache $CLANG_PATH/bin/clang" \
-              RUSTC="$WORKDIR/kernel_workspace/build-tools/rust/bin/rustc" \
-              PAHOLE="$WORKDIR/kernel_workspace/build-tools/bin/pahole" \
-              LD="$CLANG_PATH/bin/ld.lld" HOSTLD="$CLANG_PATH/bin/ld.lld" \
-              O=out KCFLAGS+=-O2 KCFLAGS+=-Wno-error \
-              gki_defconfig Image
-          elif [[ "${{ env.KERNEL_VERSION }}" == "6.6" ]]; then
-            # 6.6内核：文件2逻辑+文件1路径适配
-            make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- \
-              CC="ccache $CLANG_PATH/bin/clang" \
-              RUSTC="$WORKDIR/kernel_workspace/build-tools/rust/bin/rustc" \
-              PAHOLE="$WORKDIR/kernel_workspace/build-tools/bin/pahole" \
-              LD="$CLANG_PATH/bin/ld.lld" HOSTLD="$CLANG_PATH/bin/ld.lld" \
-              O=out KCFLAGS+=-O2 KCFLAGS+=-Wno-error \
-              gki_defconfig Image
-          fi
-          
-          # 8. 保留原编译结果校验
-          echo "--- [校验] 编译结果 ---"
-          IMAGE_PATH=$(find ./out -name "Image" | head -n 1)
-          if [[ -z "$IMAGE_PATH" || ! -f "$IMAGE_PATH" ]]; then
-            echo "❌ 未找到内核镜像，构建失败" >&2
-            exit 1
-          else
-            echo "✅ 内核镜像路径: $IMAGE_PATH"
-            if strings "$IMAGE_PATH" | grep -q "$(echo $DATESTR | awk '{print $1,$2,$3}')"; then
-              echo "✅ 构建时间已成功写入内核"
-            fi
-          fi
-          
-          # 9. 保留原ccache状态输出
-          echo "✅ 内核编译完成！"
-          echo "📊 ccache状态："
-          ccache -s
-          echo "💾 磁盘空间:"
-          df -h
+         INPUT_TIME="${{ env.KERNEL_TIME }}"
+         if [[ -n "$INPUT_TIME" ]]; then
+          DATESTR="$INPUT_TIME"
+          echo "✅ 已设置构建时间: $DATESTR"
+         else
+          DATESTR="$(TZ='UTC' date +'%a %b %d %T %Z %Y')"
+          echo "⚠️  未获取自定义时间，使用UTC当前时间: $DATESTR"
+         fi
+         export KBUILD_BUILD_TIMESTAMP="$DATESTR"
+         export KBUILD_BUILD_VERSION=1
+         cd "$WORKDIR/kernel_workspace/common"
+         CLANG_PATH="$WORKDIR/kernel_workspace/$CLANG_DIR"
+
+         echo "===== 路径调试 ====="
+         echo "CLANG_DIR的值：$CLANG_DIR"
+         echo "CLANG_PATH的实际路径：$CLANG_PATH"
+         echo "检查CLANG_PATH下的clang：$(ls $CLANG_PATH/clang 2>/dev/null || echo "❌ 不存在")"
+         echo "检查CLANG_PATH下的ld.lld：$(ls $CLANG_PATH/ld.lld 2>/dev/null || echo "❌ 不存在")"
+         echo "===================="
+         export PATH="$CLANG_PATH:$WORKDIR/kernel_workspace/build-tools/bin:$PATH"
+
+         sudo apt install -y libelf-dev
+
+         echo '#!/bin/bash' > cc-wrapper && chmod +x cc-wrapper
+         echo 'ccache clang "$@"' >> cc-wrapper
+         echo '#!/bin/bash' > ld-wrapper && chmod +x ld-wrapper
+         echo 'ld.lld "$@"' >> ld-wrapper
+
+         sudo rm -rf /usr/share/dotnet &
+         sudo rm -rf /usr/local/lib/android &
+         sudo rm -rf /opt/ghc &
+         sudo rm -rf /opt/hostedtoolcache/CodeQL &
+         wait
+
+         if [[ "${{ env.KERNEL_VERSION }}" == "6.1" ]]; then
+           make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- \
+           CC="ccache $CLANG_PATH/clang" \
+           RUSTC="$WORKDIR/kernel_workspace/build-tools/rust/bin/rustc" \
+           PAHOLE="$WORKDIR/kernel_workspace/build-tools/bin/pahole" \
+           LD="$CLANG_PATH/ld.lld" HOSTLD="$CLANG_PATH/ld.lld" \
+           O=out KCFLAGS+=-O2 KCFLAGS+=-Wno-error \
+           gki_defconfig Image
+         elif [[ "${{ env.KERNEL_VERSION }}" == "6.6" ]]; then
+           make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- \
+           CC="ccache $CLANG_PATH/clang" \
+           RUSTC="$WORKDIR/kernel_workspace/build-tools/rust/bin/rustc" \
+           PAHOLE="$WORKDIR/kernel_workspace/build-tools/bin/pahole" \
+           LD="$CLANG_PATH/ld.lld" HOSTLD="$CLANG_PATH/ld.lld" \
+            O=out KCFLAGS+=-O2 KCFLAGS+=-Wno-error \
+           gki_defconfig Image
+         fi
+         
+         ccache -s
+         echo "💾 磁盘空间:"
+         df -h
         if: contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
-      # ========== 构建步骤移植结束 ==========
 
       - name: 制作 Anykernel3
         run: |
