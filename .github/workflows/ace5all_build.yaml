@@ -303,7 +303,6 @@ jobs:
         if: contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
 
       - name: 启用内核级基带保护
-        if: inputs.baseband_guard
         run: |
           cd kernel_workspace
           echo "CONFIG_BBG=y" >> ./common/arch/arm64/configs/gki_defconfig
