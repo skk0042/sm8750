@@ -437,7 +437,7 @@ jobs:
           # 3. 移植文件2：：按内核版本设置编译器、RUSTC、PAHOLE路径
           cd "$WORKDIR/kernel_workspace/common"
           CLANG_PATH="$WORKDIR/kernel_workspace/$CLANG_DIR"
-          export PATH="$CLANG_PATH:$WORKDIR/kernel_workspace/build-tools/bin:$PATH"
+          export PATH="$CLANG_PATH:$WORKDIR/kernel_workspace/build-tools:$PATH"
           
           # 安装依赖（文件2逻辑）
           sudo apt install -y libelf-dev
