@@ -19,11 +19,6 @@ on:
         description: "自定义构建时间（格式：Tue Jul  1 19:48:18 UTC 2025）"
         required: false
         default: ''
-      enable_fengchi:
-        description: "是否启用风驰驱动（sm8750=ace6, sm8650=12, mt6991=ace5ultra, mt6989=ace5 race）"
-        required: true
-        default: true
-        type: boolean
 
 jobs:
   batch_build:
@@ -50,7 +45,7 @@ jobs:
           fetch-depth: 0
         if: contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
 
-      - name: 处理器型号配置（核心：按处理器映射源码/参数）
+      - name: 先前配置
         run: |
           case "${{ env.DEVICES_NAME }}" in
             oneplus_sm8750)
