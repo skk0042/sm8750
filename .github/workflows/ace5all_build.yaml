@@ -365,7 +365,6 @@ jobs:
         if: contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
         
       - name: 启用网络功能增强优化配置
-        if: inputs.better_net
         run: |
           cd kernel_workspace
           #启用  BPF 流解析器,实现高性能网络流量处理,增强网络监控和分析能力
