@@ -50,18 +50,22 @@ jobs:
           case "${{ env.DEVICES_NAME }}" in
             oneplus_sm8750)
               echo "CHIPSET=sm8750" >> $GITHUB_ENV
+              echo "ANDROID_VERSION=android15" >> $GITHUB_ENV
               echo "KERNEL_VERSION=6.6" >> $GITHUB_ENV
               ;;
             oneplus_sm8650)
               echo "CHIPSET=sm8650" >> $GITHUB_ENV
+              echo "ANDROID_VERSION=android14" >> $GITHUB_ENV
               echo "KERNEL_VERSION=6.1" >> $GITHUB_ENV
               ;;
             oneplus_mt6991)
               echo "CHIPSET=mt6991" >> $GITHUB_ENV
+              echo "ANDROID_VERSION=android15" >> $GITHUB_ENV
               echo "KERNEL_VERSION=6.6" >> $GITHUB_ENV
               ;;
             oneplus_mt6989)
               echo "CHIPSET=mt6989" >> $GITHUB_ENV
+              echo "ANDROID_VERSION=android14" >> $GITHUB_ENV
               echo "KERNEL_VERSION=6.1" >> $GITHUB_ENV
               ;;
           esac
@@ -293,45 +297,7 @@ jobs:
           patch -p1 < 69_hide_stuff.patch || true
         if: contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
         
-      - name: 添加风驰驱动
-        run: |
-          cd kernel_workspace/common
-            echo "✅ 启用风驰驱动，开始移植（当前芯片：${{ env.CHIPSET }}）"
-            case "${{ env.CHIPSET }}" in
-              sm8750)
-                DEVICE_FILE="oneplus_ace_6"
-                ;;
-              sm8650)
-                DEVICE_FILE="oneplus_12"
-                ;;
-              mt6991)
-                DEVICE_FILE="oneplus_ace5_ultra_b"
-                ;;
-              mt6989)
-                DEVICE_FILE="oneplus_ace5_race"
-                ;;
-              *)
-                echo "⚠️ 未支持当前芯片（${{ env.CHIPSET }}）的风驰驱动，跳过"
-                exit 0
-                ;;
-            esac
-            
-            git clone https://github.com/Numbersf/SCHED_PATCH.git -b ${{ env.CHIPSET }} || {
-              echo "❌ 风驰补丁仓库分支（${{ env.CHIPSET }}）不存在，跳过驱动移植"
-              exit 0
-            }
-            
-            FENGCHI_PATCH="SCHED_PATCH/fengchi_${DEVICE_FILE}.patch"
-            if [[ -f "$FENGCHI_PATCH" ]]; then
-              echo "📥 找到对应机型补丁：$FENGCHI_PATCH"
-              dos2unix "$FENGCHI_PATCH"
-              patch -p1 -F 3 < "$FENGCHI_PATCH" || echo "⚠️ 风驰补丁应用失败（可能与当前内核不兼容），跳过"
-              echo "✅ 风驰驱动移植完成（机型：${DEVICE_FILE}）"
-            else
-              echo "❌ 未找到 ${DEVICE_FILE} 的风驰补丁（${FENGCHI_PATCH}），跳过"
-            fi
-            rm -rf ./SCHED_PATCH
-        if: contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
+
 
       - name: 解决零宽字符漏洞
         run: |
@@ -415,6 +381,46 @@ jobs:
           echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y" >> ./common/arch/arm64/configs/gki_defconfig
           echo "CONFIG_HEADERS_INSTALL=n" >> ./common/arch/arm64/configs/gki_defconfig
           sudo sed -i 's/check_defconfig//' ./common/build.config.gki
+        if: contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
+
+      - name: 添加风驰驱动
+        run: |
+          cd kernel_workspace/common
+            echo "✅ 启用风驰驱动，开始移植（当前芯片：${{ env.CHIPSET }}）"
+            case "${{ env.CHIPSET }}" in
+              sm8750)
+                DEVICE_FILE="oneplus_ace_6"
+                ;;
+              sm8650)
+                DEVICE_FILE="oneplus_12"
+                ;;
+              mt6991)
+                DEVICE_FILE="oneplus_ace5_ultra_b"
+                ;;
+              mt6989)
+                DEVICE_FILE="oneplus_ace5_race"
+                ;;
+              *)
+                echo "⚠️ 未支持当前芯片（${{ env.CHIPSET }}）的风驰驱动，跳过"
+                exit 0
+                ;;
+            esac
+            
+            git clone https://github.com/Numbersf/SCHED_PATCH.git -b ${{ env.CHIPSET }} || {
+              echo "❌ 风驰补丁仓库分支（${{ env.CHIPSET }}）不存在，跳过驱动移植"
+              exit 0
+            }
+            
+            FENGCHI_PATCH="SCHED_PATCH/fengchi_${DEVICE_FILE}.patch"
+            if [[ -f "$FENGCHI_PATCH" ]]; then
+              echo "📥 找到对应机型补丁：$FENGCHI_PATCH"
+              dos2unix "$FENGCHI_PATCH"
+              patch -p1 -F 3 < "$FENGCHI_PATCH" || echo "⚠️ 风驰补丁应用失败（可能与当前内核不兼容），跳过"
+              echo "✅ 风驰驱动移植完成（机型：${DEVICE_FILE}）"
+            else
+              echo "❌ 未找到 ${DEVICE_FILE} 的风驰补丁（${FENGCHI_PATCH}），跳过"
+            fi
+            rm -rf ./SCHED_PATCH
         if: contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
 
       - name: 构建内核
