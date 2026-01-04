@@ -146,18 +146,7 @@ jobs:
           esac
           rm -rf common.zip 
           
-          echo "正在克隆工具链（${KERNEL_VERSION}内核适配）..."
-          if [[ $KERNEL_VERSION == 6.1.* ]]; then
-            mkdir -p clang20 &&
-            aria2c -s16 -x16 -k1M https://github.com/cctv18/oneplus_sm8650_toolchain/releases/download/LLVM-Clang20-r547379/clang-r547379.zip -o clang.zip &&
-            unzip -q clang.zip -d clang20 && rm -rf clang.zip
-            echo "CLANG_DIR=clang20/bin" >> $GITHUB_ENV
-            if [ ! -f "clang20/bin/clang" ] || [ ! -f "clang20/bin/ld.lld" ]; then
-              echo "❌ clang20工具链解压失败，文件缺失"
-              ls -la clang20/bin/
-              exit 1
-            fi
-          else
+          echo "正在克隆工具链"
             mkdir -p clang18 &&
             aria2c -s16 -x16 -k1M https://github.com/cctv18/oneplus_sm8650_toolchain/releases/download/LLVM-Clang18-r510928/clang-r510928.zip -o clang.zip &&
             unzip -q clang.zip -d clang18 && rm -rf clang.zip
@@ -167,17 +156,20 @@ jobs:
               ls -la clang18/bin/
               exit 1
             fi
-          fi
           
           aria2c -s16 -x16 -k1M https://github.com/cctv18/oneplus_sm8650_toolchain/releases/download/LLVM-Clang18-r510928/build-tools.zip -o build-tools.zip &&
           unzip -q build-tools.zip && rm -rf build-tools.zip &
           wait
           
+          wait
+          echo "所有源码及llvm-Clang18工具链初始化完成！"
+          echo "正在去除 ABI 保护 & 去除 dirty 后缀..."
           rm common/android/abi_gki_protected_exports_* || true
           for f in common/scripts/setlocalversion; do
             sed -i 's/ -dirty//g' "$f"
             sed -i '$i res=$(echo "$res" | sed '\''s/-dirty//g'\'')' "$f"
           done
+          
         if: contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
 
       - name: 配置 ccache
@@ -222,34 +214,6 @@ jobs:
           fi
         if: contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
 
-      - name: 添加 lz4 1.10.0 & zstd 1.5.7补丁
-        run: |
-          cd kernel_workspace
-          echo "正在添加压缩补丁"
-          if [[ $CHIPSET == sm8750 || $CHIPSET == mt6991 ]]; then
-            git clone --depth=1 https://github.com/cctv18/oppo_oplus_realme_sm8750.git patch_repo
-          else
-            git clone --depth=1 https://github.com/cctv18/oppo_oplus_realme_sm8650.git patch_repo
-          fi
-          
-          cp ./patch_repo/zram_patch/001-lz4.patch ./common
-          cp ./patch_repo/zram_patch/lz4armv8.S ./common/lib
-          cp ./patch_repo/zram_patch/002-zstd.patch ./common/
-          
-          if [[ $CHIPSET == mt6991 ]]; then
-            cp ./patch_repo/zram_patch/001-lz4-clearMake.patch ./common
-          fi
-          
-          cd ./common
-          git apply -p1 < 001-lz4.patch || true
-          if [[ $CHIPSET == mt6991 ]]; then
-            git apply -p1 < 001-lz4-clearMake.patch || true
-          fi
-          patch -p1 < 002-zstd.patch || true
-          
-          rm -f 001-lz4.patch 002-zstd.patch 001-lz4-clearMake.patch
-          rm -rf ../patch_repo
-        if: contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
 
       - name: 配置 SuKiSU Ultra
         run: |
@@ -314,6 +278,35 @@ jobs:
            patch -p1 --forward < "${PATCH_DIR}/unicode_bypass_fix_6.1+.patch" || echo "unicode_bypass_fix_6.1+.patch 已应用"
         if: contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
         
+      - name: 添加 lz4 1.10.0 & zstd 1.5.7补丁
+        run: |
+          cd kernel_workspace
+          echo "正在添加压缩补丁"
+          if [[ $CHIPSET == sm8750 || $CHIPSET == mt6991 ]]; then
+            git clone --depth=1 https://github.com/cctv18/oppo_oplus_realme_sm8750.git patch_repo
+          else
+            git clone --depth=1 https://github.com/cctv18/oppo_oplus_realme_sm8650.git patch_repo
+          fi
+          
+          cp ./patch_repo/zram_patch/001-lz4.patch ./common
+          cp ./patch_repo/zram_patch/lz4armv8.S ./common/lib
+          cp ./patch_repo/zram_patch/002-zstd.patch ./common/
+          
+          if [[ $CHIPSET == mt6991 ]]; then
+            cp ./patch_repo/zram_patch/001-lz4-clearMake.patch ./common
+          fi
+          
+          cd ./common
+          git apply -p1 < 001-lz4.patch || true
+          if [[ $CHIPSET == mt6991 ]]; then
+            git apply -p1 < 001-lz4-clearMake.patch || true
+          fi
+          patch -p1 < 002-zstd.patch || true
+          
+          rm -f 001-lz4.patch 002-zstd.patch 001-lz4-clearMake.patch
+          rm -rf ../patch_repo
+        if: contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
+        
       - name: 设置编译配置
         run: |
           cd kernel_workspace
@@ -336,6 +329,33 @@ jobs:
           echo "CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y" >> ./common/arch/arm64/configs/gki_defconfig
           echo "CONFIG_KSU_SUSFS_OPEN_REDIRECT=y" >> ./common/arch/arm64/configs/gki_defconfig
           echo "CONFIG_KSU_SUSFS_SUS_MAP=y" >> ./common/arch/arm64/configs/gki_defconfig
+          
+          echo "CONFIG_BPF_STREAM_PARSER=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_NETFILTER_XT_MATCH_ADDRTYPE=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_NETFILTER_XT_SET=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_IP_SET=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_IP_SET_MAX=65534" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_IP_SET_BITMAP_IP=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_IP_SET_BITMAP_IPMAC=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_IP_SET_BITMAP_PORT=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_IP_SET_HASH_IP=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_IP_SET_HASH_IPMARK=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_IP_SET_HASH_IPPORT=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_IP_SET_HASH_IPPORTIP=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_IP_SET_HASH_IPPORTNET=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_IP_SET_HASH_IPMAC=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_IP_SET_HASH_MAC=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_IP_SET_HASH_NETPORTNET=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_IP_SET_HASH_NET=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_IP_SET_HASH_NETNET=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_IP_SET_HASH_NETPORT=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_IP_SET_HASH_NETIFACE=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_IP_SET_LIST_SET=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_IP6_NF_NAT=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_IP6_NF_TARGET_MASQUERADE=y" >> ./common/arch/arm64/configs/gki_defconfig
+          cd common
+          wget https://github.com/cctv18/oppo_oplus_realme_sm8750/raw/refs/heads/main/other_patch/config.patch
+          patch -p1 -F 3 < config.patch || true
           
           if [[ $KERNEL_VERSION == 6.1 ]]; then
            echo "启用三星SSG IO调度器（6.1内核）"
@@ -449,27 +469,18 @@ jobs:
         run: |
           git clone https://github.com/skk0042/AnyKernel3 --depth=1
           rm -rf ./AnyKernel3/.git
-          mkdir -p kernel_workspace/out/Final-Image-Find/
-          
-          image_path=$(find "./kernel_workspace/common/out/" -type f -name "Image" -print -quit)
-          if [ -z "$image_path" ]; then
-            echo "❌ 未找到Image文件，构建失败"
-            ls -la ./kernel_workspace/common/out/
-            exit 1
+          mkdir -p kernel_workspace/kernel_platform/out/Final-Image-Find/
+          dir1=""
+          dir2=""
+          image_path=$(find "./kernel_workspace/kernel_platform/common/out/" -name "Image" | head -n 1)
+          if [ -n "$image_path" ]; then
+            dir1=$(dirname "$image_path")/
+            echo "✅ 成功找到 Image 文件"
           fi
-          
-          cp "$image_path" ./AnyKernel3/Image
-          cp "$image_path" kernel_workspace/out/Final-Image-Find/Image
-          
-          if [[ "${{ env.CHIPSET }}" == "sm8750" ]]; then
-            dir2=$(dirname "$image_path")/
-            for file in dtbo.img system_dlkm.erofs.img; do
-              if [ -f "$dir2$file" ]; then
-                target_name="$file"
-                [[ $file == "system_dlkm.erofs.img" ]] && target_name="system_dlkm.img"
-                cp "$dir2$file" "./AnyKernel3/$target_name"
-              fi
-            done
+          if [ -n "$image_path" ] && [ -f "$image_path" ]; then
+            echo "Image file finally located at: $image_path"
+            cp "$image_path" ./AnyKernel3/Image
+            cp "$image_path" kernel_workspace/kernel_platform/out/Final-Image-Find/Image
           fi
         if: contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
 
