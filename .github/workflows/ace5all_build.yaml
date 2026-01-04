@@ -459,21 +459,30 @@ jobs:
         run: |
           git clone https://github.com/skk0042/AnyKernel3 --depth=1
           rm -rf ./AnyKernel3/.git
-          mkdir -p kernel_workspace/kernel_platform/out/Final-Image-Find/
-          dir1=""
-          dir2=""
-          image_path=$(find "./kernel_workspace/kernel_platform/common/out/" -name "Image" | head -n 1)
-          if [ -n "$image_path" ]; then
-            dir1=$(dirname "$image_path")/
-            echo "✅ 成功找到 Image 文件"
+          mkdir -p kernel_workspace/out/Final-Image-Find/
+          
+          image_path=$(find "./kernel_workspace/common/out/" -type f -name "Image" -print -quit)
+          if [ -z "$image_path" ]; then
+            echo "❌ 未找到Image文件，构建失败"
+            ls -la ./kernel_workspace/common/out/
+            exit 1
           fi
-          if [ -n "$image_path" ] && [ -f "$image_path" ]; then
-            echo "Image file finally located at: $image_path"
-            cp "$image_path" ./AnyKernel3/Image
-            cp "$image_path" kernel_workspace/kernel_platform/out/Final-Image-Find/Image
+          
+          cp "$image_path" ./AnyKernel3/Image
+          cp "$image_path" kernel_workspace/out/Final-Image-Find/Image
+          
+          if [[ "${{ env.CHIPSET }}" == "sm8750" ]]; then
+            dir2=$(dirname "$image_path")/
+            for file in dtbo.img system_dlkm.erofs.img; do
+              if [ -f "$dir2$file" ]; then
+                target_name="$file"
+                [[ $file == "system_dlkm.erofs.img" ]] && target_name="system_dlkm.img"
+                cp "$dir2$file" "./AnyKernel3/$target_name"
+              fi
+            done
           fi
         if: contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
-
+        
       - name: 上传 Anykernel3
         uses: actions/upload-artifact@v4
         with:
