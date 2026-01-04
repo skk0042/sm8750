@@ -279,12 +279,37 @@ jobs:
            patch -p1 --forward < "${PATCH_DIR}/unicode_bypass_fix_6.1+.patch" || echo "unicode_bypass_fix_6.1+.patch 已应用"
         if: contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
 
-      - name: 添加 BBG
+      - name: 启用内核级基带保护
         run: |
-          cd kernel_workspace/kernel_platform/common
-          echo "正在启用内核级基带保护支持…"
-          curl -LSs https://raw.githubusercontent.com/vc-teahouse/Baseband-guard/main/setup.sh | bash
-          sed -i '/^config LSM$/,/^help$/{ /^[[:space:]]*default/ { /baseband_guard/! s/selinux/selinux,baseband_guard/ } }' ./security/Kconfig
+          echo "正在启用启用内核级基带保护支持…"
+          cd kernel_workspace
+          echo "CONFIG_BBG=y" >> ./common/arch/arm64/configs/gki_defconfig
+          cd ./common/security
+          wget https://github.com/cctv18/Baseband-guard/archive/refs/heads/master.zip
+          unzip -q master.zip
+          mv "Baseband-guard-master" baseband-guard
+          printf '\nobj-$(CONFIG_BBG) += baseband-guard/\n' >> ./Makefile
+          sed -i '/^config LSM$/,/^help$/{ /^[[:space:]]*default/ { /baseband_guard/! s/lockdown/lockdown,baseband_guard/ } }' ./Kconfig
+          awk '
+          /endmenu/ { last_endmenu_line = NR }
+          { lines[NR] = $0 }
+          END {
+            for (i=1; i<=NR; i++) {
+              if (i == last_endmenu_line) {
+                sub(/endmenu/, "", lines[i]);
+                print lines[i] "source \"security/baseband-guard/Kconfig\""
+                print ""
+                print "endmenu"
+              } else {
+                  print lines[i]
+              }
+            }
+          }
+          ' ./Kconfig > Kconfig.tmp && mv Kconfig.tmp ./Kconfig
+          sed -i 's/selinuxfs.o //g' "./selinux/Makefile"
+          sed -i 's/hooks.o //g' "./selinux/Makefile"
+          cat "./baseband-guard/sepatch.txt" >> "./selinux/Makefile"
+        if: contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
         
       - name: 添加 lz4 1.10.0 & zstd 1.5.7补丁
         run: |
