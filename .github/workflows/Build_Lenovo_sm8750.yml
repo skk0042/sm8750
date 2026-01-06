@@ -25,23 +25,7 @@ on:
         required: false
         default: ''
 
-      enable_feature_a:
-        description: "开启BBG基带守护"
-        required: false
-        default: false
-        type: boolean
 
-      enable_feature_b:
-        description: "开启KPM"
-        required: false
-        default: true
-        type: boolean
-
-      enable_feature_c:
-        description: "使用AOSP密钥签名boot"
-        required: false
-        default: true
-        type: boolean
 
       
        
@@ -55,7 +39,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: ⚙️ Set Kernel version config(设置对应内核版本配置文件)
+      - name: 设置对应内核版本配置文件
         run: |
           echo "sub_level=${{ github.event.inputs.sub_level }}" >> $GITHUB_ENV
           echo "KERNEL_TIME=${{ github.event.inputs.custom_kernel_time }}" >> $GITHUB_ENV
@@ -106,7 +90,7 @@ jobs:
             echo "KERNEL_TIME=${{ github.event.inputs.custom_kernel_time }}" >> $GITHUB_ENV
           fi
 
-      - name: 🛠 Install dependencies and Initialize repo and sync （安装环境依赖+初始化源码仓库及工具链）
+      - name: 安装环境依赖+初始化源码仓库及工具链
         run: |
           rm -rf kernel_workspace
           mkdir kernel_workspace
@@ -145,7 +129,7 @@ jobs:
             sed -i '$i res=$(echo "$res" | sed '\''s/-dirty//g'\'')' "$f"
           done
 
-      - name: 🛠 Set ccache DIR(配置ccache目录)
+      - name: 配置ccache目录
         run: |
           echo "CCACHE_DIR=$HOME/.ccache_${{ env.sub_level }}" >> $GITHUB_ENV
           echo "CCACHE_MAXSIZE=3G" >> $GITHUB_ENV
@@ -153,7 +137,7 @@ jobs:
           df -h
           echo "当前构建内核版本：${{ env.sub_level }}"
 
-      - name: 📥 Restore ccache (载入当前内核版本的ccache缓存)
+      - name: 载入当前内核版本的ccache缓存
         uses: actions/cache@v4
         id: ccache-restore
         with:
@@ -163,7 +147,7 @@ jobs:
             ccache-neov2-${{ env.sub_level }}-${{ runner.os }}-
             ccache-neov2-${{ env.sub_level }}-
       
-      - name: 📥 Init ccache (初始化并配置ccache)
+      - name: 初始化并配置ccache
         run: |
           # 设置ccache环境变量
           export CCACHE_COMPILERCHECK="none"
@@ -190,8 +174,7 @@ jobs:
             echo "ccache缓存命中详情:"
             ccache -sv
           fi
-      - name: 🛠 Set Baseband-guard (配置BBG基带守护)
-        if: ${{inputs.enable_feature_a}}
+      - name: 配置BBG基带守护
         run: |
           echo "正在启用启用内核级基带保护支持…"
           cd kernel_workspace
@@ -261,10 +244,10 @@ jobs:
           PATCH_DIR="${GITHUB_WORKSPACE}/kernel_workspace/sm8750_patches/patches"
           cd common
           
-           patch -p1 --forward < "${PATCH_DIR}/unicode_bypass.patch" || true
+           patch -p1 --forward < "${PATCH_DIR}/unicode-bypass.patch" || true
         if: contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
 
-      - name: ⚙️ apply lz4 lz4 1.10.0 & zstd 1.5.7 Patch (应用lz4 1.10.0 & zstd 1.5.7补丁)
+      - name: 应用lz4 1.10.0 & zstd 1.5.7补丁
         run: |
           echo "正在添加lz4 1.10.0 & zstd 1.5.7补丁…"
           cd kernel_workspace
@@ -277,7 +260,7 @@ jobs:
           patch -p1 < 002-zstd.patch || true
 
           
-      - name: 🔧 Set gki_defconfig (设置编译配置)
+      - name: 设置编译配置
         env:
           ENABLE_B: ${{ github.event.inputs.enable_feature_b }} 
         run: |
@@ -324,7 +307,7 @@ jobs:
           #Remove check_defconfig
           sudo sed -i 's/check_defconfig//' ./common/build.config.gki
 
-      - name: 🔧 Set Kernel name (写入内核名称)
+      - name: 写入内核名称
         run: |
           cd kernel_workspace
           echo "自定义后缀: $DEFAULT_SUFFIX"
@@ -332,7 +315,7 @@ jobs:
           sudo sed -i "s/-4k/$ESCAPED_SUFFIX/g" ./common/arch/arm64/configs/gki_defconfig
           sed -i 's/${scm_version}//' ./common/scripts/setlocalversion
           
-      - name: 🔨 Build Kernel (构建内核)
+      - name: 构建内核
         run: |
           WORKDIR="$(pwd)"
           export PATH="/usr/lib/ccache:$PATH"
@@ -417,19 +400,13 @@ jobs:
           echo "编译后空间:"
           df -h
           
-      - name: 📦 ReName Image  (修改镜像名)
+      - name: 修改镜像name
         run: |
           cd kernel_workspace/common/out/arch/arm64/boot
           cp ./Image "./kernel"
 
-      - name: 📤 Upload Image (上传 Image)
-        uses: actions/upload-artifact@v4
-        with:
-         name: kernel_image
-         path: kernel_workspace/common/out/arch/arm64/boot/kernel
          
-      - name: 📦 Sign boot using AOSP test key (使用AOSP测试密钥签名boot)
-        if: ${{inputs.enable_feature_c}}
+      - name: 签名 boot
         run: |
           cd kernel_workspace
           aria2c -s16 -x16 -k1M "https://github.com/showdo/AOSP-Testkey-BootSigner/archive/refs/heads/main.tar.gz" -o boot_avb_tool.tar.gz && \
@@ -445,7 +422,7 @@ jobs:
           mv ./new-boot.img ./boot.img
           python3 rebuild_avb.py --chained-mode
 
-      - name: 📤 Upload Signed boot (上传已签名的 boot)
+      - name: 上传已签名的 boot
         if: ${{inputs.enable_feature_c}}
         uses: actions/upload-artifact@v4
         with:
