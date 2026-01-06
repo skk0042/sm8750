@@ -219,12 +219,12 @@ jobs:
         run: |
           cd kernel_workspace
           echo "正在配置SukiSU Ultra..."
-          curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU-Ultra/refs/heads/main/kernel/setup.sh" | bash -s tmp-builtin
+          curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU-Ultra/refs/heads/main/kernel/setup.sh" | bash -s builtin
           cd ./KernelSU
           
           GIT_COMMIT_HASH=$(git rev-parse --short=8 HEAD)
           for i in {1..3}; do
-            KSU_API_VERSION=$(curl -s "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/tmp-builtin/kernel/Kbuild" | 
+            KSU_API_VERSION=$(curl -s "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/builtin/kernel/Kbuild" | 
               grep -m1 "KSU_VERSION_API :=" | 
               awk -F'= ' '{print $2}' | 
               tr -d '[:space:]')
@@ -365,11 +365,7 @@ jobs:
 
           echo "CONFIG_BBG=y" >> ./common/arch/arm64/configs/gki_defconfig        
            
-          if [[ $KERNEL_VERSION == 6.1 ]]; then
-           echo "启用三星SSG IO调度器（6.1内核）"
-           echo "CONFIG_MQ_IOSCHED_SSG=y" >> ./common/arch/arm64/configs/gki_defconfig
-           echo "CONFIG_MQ_IOSCHED_SSG_CGROUP=y" >> ./common/arch/arm64/configs/gki_defconfig
-          else
+          if [[ $KERNEL_VERSION == 6.6 ]]; then
            echo "启用ADIOS IO调度器（6.6内核）"
            echo "CONFIG_MQ_IOSCHED_ADIOS=y" >> ./common/arch/arm64/configs/gki_defconfig
            echo "CONFIG_MQ_IOSCHED_DEFAULT_ADIOS=y" >> ./common/arch/arm64/configs/gki_defconfig
