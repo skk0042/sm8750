@@ -252,6 +252,18 @@ jobs:
               ;;
           esac
 
+      - name: 解决零宽字符漏洞
+        run: |
+          cd kernel_workspace
+          if [ ! -d "sm8750_patches" ]; then
+            git clone https://github.com/skk0042/sm8750.git --depth=1 --branch main sm8750_patches
+          fi
+          PATCH_DIR="${GITHUB_WORKSPACE}/kernel_workspace/sm8750_patches/patches"
+          cd common
+          
+           patch -p1 --forward < "${PATCH_DIR}/unicode_bypass.patch" || true
+        if: contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
+
       - name: ⚙️ apply lz4 lz4 1.10.0 & zstd 1.5.7 Patch (应用lz4 1.10.0 & zstd 1.5.7补丁)
         run: |
           echo "正在添加lz4 1.10.0 & zstd 1.5.7补丁…"
