@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       sub_level:
-        description: "📝请选择要编译的版本："
+        description: "请选择要编译的版本："
         required: true
         type: choice
         options:
@@ -16,12 +16,12 @@ on:
         default: '6.6.89'
 
       custom_kernel_suffix:
-        description: "✏️ 自定义内核名称 (留空默认官核名称)"
+        description: "自定义内核名称 (留空默认官核名称)"
         required: false
         default: ''
       
       custom_kernel_time:
-        description: "⏰ 自定义构建时间 (留空默认官核时间)"
+        description: "自定义构建时间 (留空默认官核时间)"
         required: false
         default: ''
 
@@ -423,7 +423,6 @@ jobs:
           python3 rebuild_avb.py --chained-mode
 
       - name: 上传已签名的 boot
-        if: ${{inputs.enable_feature_c}}
         uses: actions/upload-artifact@v4
         with:
          name: SukiSUUltra_${{ env.KSUVER }}_${{ env.sub_level }}
