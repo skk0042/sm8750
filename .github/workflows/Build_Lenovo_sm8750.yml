@@ -174,15 +174,7 @@ jobs:
             echo "ccache缓存命中详情:"
             ccache -sv
           fi
-      - name: 配置BBG基带守护
-        run: |
-          echo "正在启用启用内核级基带保护支持…"
-          cd kernel_workspace
-          wget -O- https://github.com/vc-teahouse/Baseband-guard/raw/main/setup.sh | bash
-          echo "CONFIG_BBG=y" >> ./common/arch/arm64/configs/gki_defconfig
-          sed -i '/^config LSM$/,/^help$/{ /^[[:space:]]*default/ { /baseband_guard/! s/lockdown/lockdown,baseband_guard/ } }' ./common/security/Kconfig
-
-      
+  
       - name: 配置 SuKiSU Ultra
         run: |
           cd kernel_workspace
