@@ -279,6 +279,7 @@ jobs:
            patch -p1 --forward < "${PATCH_DIR}/unicode-bypass.patch" || true
         if: contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
 
+        
       - name: 添加 lz4 1.10.0 & zstd 1.5.7补丁
         run: |
           cd kernel_workspace
@@ -331,7 +332,6 @@ jobs:
           echo "CONFIG_KSU_SUSFS_OPEN_REDIRECT=y" >> ./common/arch/arm64/configs/gki_defconfig
           echo "CONFIG_KSU_SUSFS_SUS_MAP=y" >> ./common/arch/arm64/configs/gki_defconfig
 
-          echo "CONFIG_BBG=y" >> ./common/arch/arm64/configs/gki_defconfig        
            
           if [[ $KERNEL_VERSION == 6.6 ]]; then
            echo "启用ADIOS IO调度器（6.6内核）"

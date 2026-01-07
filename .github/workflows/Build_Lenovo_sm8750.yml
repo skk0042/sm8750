@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       sub_level:
-        description: "请选择要编译的版本："
+        description: "编译的版本："
         required: true
         type: choice
         options:
@@ -25,7 +25,11 @@ on:
         required: false
         default: ''
 
-
+      enable_feature_b:
+        description: "开启KPM"
+        required: false
+        default: true
+        type: boolean
 
       
        
@@ -174,7 +178,15 @@ jobs:
             echo "ccache缓存命中详情:"
             ccache -sv
           fi
-  
+      - name: 配置BBG基带守护
+        run: |
+          echo "正在启用启用内核级基带保护支持…"
+          cd kernel_workspace
+          wget -O- https://github.com/vc-teahouse/Baseband-guard/raw/main/setup.sh | bash
+          echo "CONFIG_BBG=y" >> ./common/arch/arm64/configs/gki_defconfig
+          sed -i '/^config LSM$/,/^help$/{ /^[[:space:]]*default/ { /baseband_guard/! s/lockdown/lockdown,baseband_guard/ } }' ./common/security/Kconfig
+
+      
       - name: 配置 SuKiSU Ultra
         run: |
           cd kernel_workspace
@@ -391,13 +403,24 @@ jobs:
           ccache -s
           echo "编译后空间:"
           df -h
-          
+
+      - name: 应用 KPM
+        if: ${{inputs.enable_feature_b}}
+        run: |
+          echo "正在应用KPM并修补内核..."
+          cd kernel_workspace/common/out/arch/arm64/boot
+          curl -LO https://github.com/ShirkNeko/SukiSU_KernelPatch_patch/releases/download/0.12.2/patch_linux
+          chmod +x patch_linux
+          ./patch_linux
+          rm -f Image
+          mv oImage Image
+
       - name: 修改镜像name
         run: |
           cd kernel_workspace/common/out/arch/arm64/boot
           cp ./Image "./kernel"
 
-         
+
       - name: 签名 boot
         run: |
           cd kernel_workspace
@@ -417,5 +440,5 @@ jobs:
       - name: 上传已签名的 boot
         uses: actions/upload-artifact@v4
         with:
-         name: SukiSUUltra_${{ env.KSUVER }}_${{ env.sub_level }}
+         name: SukiSUUltra_${{ env.KSUVER }}_Y700_${{ env.sub_level }}
          path: kernel_workspace/boot_avb_tool/AOSP-Testkey-BootSigner-main/boot.img
