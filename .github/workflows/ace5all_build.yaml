@@ -73,13 +73,13 @@ jobs:
                 echo 'DEFAULT_SUFFIX=-android15-8-g29d86c5fc9dd-abogki428889875-4k' >> $GITHUB_ENV
                 ;;
               oneplus_sm8650)
-                echo 'DEFAULT_SUFFIX=-android14-8-gca13bffobf09' >> $GITHUB_ENV
+                echo 'DEFAULT_SUFFIX=-android14-o-gca13bffobf09' >> $GITHUB_ENV
                 ;;
               oneplus_mt6991)
                 echo 'DEFAULT_SUFFIX=-android15-8-gd43086512890-abogki423825152-4k' >> $GITHUB_ENV
                 ;;
               oneplus_mt6989)
-                echo 'DEFAULT_SUFFIX=-android14-8-gca13bffobf09' >> $GITHUB_ENV
+                echo 'DEFAULT_SUFFIX=-android14-o-gca13bffobf09' >> $GITHUB_ENV
                 ;;
             esac
             echo "使用官核默认名称：${{ env.DEFAULT_SUFFIX }}"
@@ -129,7 +129,7 @@ jobs:
               mv "android_kernel_common_oneplus_sm8750-oneplus-sm8750_v_16.0.0_oneplus_13_6.6.89" common
               ;;
             sm8650)
-              aria2c -s16 -x16 -k1M https://github.com/cctv18/android_kernel_common_oneplus_sm8650/archive/refs/heads/oneplus/sm8650_v_15.0.0_oneplus12_6.1.118.zip -o common.zip
+              aria2c -s16 -x16 -k1M https://github.com/skk0042/android_kernel_common_oneplus_sm8650/archive/refs/heads/oneplus/sm8650_b_16.0.0_ace_5.zip -o common.zip
               unzip -q common.zip && 
               mv "android_kernel_common_oneplus_sm8650-oneplus-sm8650_v_15.0.0_oneplus12_6.1.118" common
               ;;
