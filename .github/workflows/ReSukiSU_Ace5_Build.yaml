@@ -225,7 +225,7 @@ jobs:
             echo "当前提交哈希: $GIT_COMMIT_HASH"
             export KSU_VERSION=$KSU_VERSION
             for i in {1..3}; do
-              KSU_API_VERSION=$(curl -s "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/builtin/kernel/Kbuild" | 
+              KSU_API_VERSION=$(curl -s "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/Kbuild" | 
                 grep -m1 "KSU_VERSION_API :=" | 
                 awk -F'= ' '{print $2}' | 
                 tr -d '[:space:]')
