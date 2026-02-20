@@ -1,4 +1,4 @@
-name: 构建全部ace5
+name: 同步构建
 on:
   workflow_dispatch:
     inputs:
@@ -75,25 +75,30 @@ jobs:
               ;;
           esac
 
-          # 2. 内核后缀配置（彻底解决重复叠加）
+          # 2. 内核后缀配置（原生标准格式，无横杠重复）
           if [ "${{ env.KEEP_ORIGINAL_SETTINGS }}" = "true" ] && [ -z "${{ github.event.inputs.kernel_suffix }}" ]; then
             case "${{ env.DEVICES_NAME }}" in
               oneplus_sm8750)
-                FINAL_SUFFIX="android15-8-g29d86c5fc9dd-abogki428889875-4k"
+                FINAL_SUFFIX="-android15-8-g29d86c5fc9dd-abogki428889875-4k"
                 ;;
               oneplus_sm8650)
-                FINAL_SUFFIX="android14-gca13bffobf09"
+                FINAL_SUFFIX="-android14-gca13bffobf09"
                 ;;
               oneplus_mt6991)
-                FINAL_SUFFIX="android15-8-gd43086512890-abogki423825152-4k"
+                FINAL_SUFFIX="-android15-8-gd43086512890-abogki423825152-4k"
                 ;;
               oneplus_mt6989)
-                FINAL_SUFFIX="android14-gca13bffobf09"
+                FINAL_SUFFIX="-android14-gca13bffobf09"
                 ;;
             esac
             echo "使用官核默认后缀：${FINAL_SUFFIX}"
           else
-            FINAL_SUFFIX="${{ github.event.inputs.kernel_suffix }}"
+            # 自定义后缀自动补全横杠，避免格式错误
+            if [ -n "${{ github.event.inputs.kernel_suffix }}" ]; then
+              FINAL_SUFFIX="-${{ github.event.inputs.kernel_suffix }}"
+            else
+              FINAL_SUFFIX=""
+            fi
             echo "使用自定义后缀: ${FINAL_SUFFIX}"
           fi
           echo "FINAL_SUFFIX=${FINAL_SUFFIX}" >> $GITHUB_ENV
@@ -182,9 +187,9 @@ jobs:
           echo "所有源码及llvm-Clang18工具链初始化完成！"
           echo "正在去除 ABI 保护 & 去除 dirty 后缀..."
           rm common/android/abi_gki_protected_exports_* || true
+          # 【安全修改】仅去除dirty后缀，不改动脚本结构
           for f in common/scripts/setlocalversion; do
             sed -i 's/ -dirty//g' "$f"
-            sed -i '$i res=$(echo "$res" | sed '\''s/-dirty//g'\'')' "$f"
           done
         if: contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
 
@@ -337,24 +342,25 @@ jobs:
           patch -p1 < 002-zstd.patch || true
         if: contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
 
-      - name: 编译配置
+      - name: 【全版本兼容】核心编译配置+版本锁定+IO调度器
         run: |
           cd kernel_workspace/common
           
+          # 1. 【核心修复】内核原生版本锁定，100%兼容6.1/6.6，无语法错误
+          # 先清空所有原有版本配置，彻底避免重复叠加
           sed -i '/CONFIG_LOCALVERSION=/d' ./arch/arm64/configs/gki_defconfig
           sed -i '/CONFIG_LOCALVERSION_AUTO=/d' ./arch/arm64/configs/gki_defconfig
+          
+          # 禁用自动版本生成，彻底锁定版本
           echo "CONFIG_LOCALVERSION_AUTO=n" >> ./arch/arm64/configs/gki_defconfig
+          # 写入最终后缀，内核原生标准方式，完全兼容所有版本
+          echo "CONFIG_LOCALVERSION=\"${{ env.FINAL_SUFFIX }}\"" >> ./arch/arm64/configs/gki_defconfig
 
-          for f in ./scripts/setlocalversion; do
-            sed -i '/echo "$res"/d' "$f"
-            sed -i '$a echo "-${{ env.FINAL_SUFFIX }}"' "$f"
-            sed -i 's/${scm_version}//' "$f"
-            sed -i '/git rev-parse/d' "$f"
-          done
-
+          # 2. 基础功能配置
           echo "CONFIG_KSU=y" >> ./arch/arm64/configs/gki_defconfig
           echo "CONFIG_KPM=y" >> ./arch/arm64/configs/gki_defconfig
                     
+          # SUSFS完整配置
           echo "CONFIG_KSU_SUSFS=y" >> ./arch/arm64/configs/gki_defconfig
           echo "CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y" >> ./arch/arm64/configs/gki_defconfig
           echo "CONFIG_KSU_SUSFS_SUS_PATH=y" >> ./arch/arm64/configs/gki_defconfig
@@ -371,6 +377,7 @@ jobs:
           echo "CONFIG_KSU_SUSFS_OPEN_REDIRECT=y" >> ./arch/arm64/configs/gki_defconfig
           echo "CONFIG_KSU_SUSFS_SUS_MAP=y" >> ./arch/arm64/configs/gki_defconfig
 
+          # 3. IO调度器配置（6.6 ADIOS + 6.1 SSG 完整兼容）
           if [[ ${{ env.KERNEL_VERSION }} == 6.6 ]]; then
             echo "启用ADIOS IO调度器（6.6内核）"
             echo "CONFIG_MQ_IOSCHED_ADIOS=y" >> ./arch/arm64/configs/gki_defconfig
@@ -382,6 +389,7 @@ jobs:
             echo "CONFIG_DEFAULT_IOSCHED=ssg" >> ./arch/arm64/configs/gki_defconfig
           fi
           
+          # 4. 通用基础配置
           echo "CONFIG_TMPFS_XATTR=y" >> ./arch/arm64/configs/gki_defconfig
           echo "CONFIG_TMPFS_POSIX_ACL=y" >> ./arch/arm64/configs/gki_defconfig
           echo "CONFIG_TMPFS=y" >> ./arch/arm64/configs/gki_defconfig
@@ -389,15 +397,15 @@ jobs:
           echo "CONFIG_HEADERS_INSTALL=n" >> ./arch/arm64/configs/gki_defconfig
           sudo sed -i 's/check_defconfig//' ./build.config.gki
 
+          # 配置验证日志
           echo "=== 版本配置验证 ==="
           grep "CONFIG_LOCALVERSION" ./arch/arm64/configs/gki_defconfig
           grep "CONFIG_LOCALVERSION_AUTO" ./arch/arm64/configs/gki_defconfig
-          tail -3 ./scripts/setlocalversion
           echo "=== IO调度器配置验证 ==="
           grep "CONFIG_MQ_IOSCHED" ./arch/arm64/configs/gki_defconfig
         if: contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
 
-      - name: 构建内核
+      - name: 【全版本兼容】构建内核（全程时间锁定）
         run: |
           WORKDIR="$(pwd)"
           export PATH="/usr/lib/ccache:$PATH"
@@ -408,6 +416,7 @@ jobs:
           LLD_VERSION="$($CLANG_DIR/ld.lld --version | head -n 1)"
           pahole_version=$(pahole --version 2>/dev/null | head -n1); [ -z "$pahole_version" ] && echo "pahole版本：未安装" || echo "pahole版本：$pahole_version"
 
+          # 1. ccache配置
           export CCACHE_LOGFILE="${{ github.workspace }}/kernel_workspace/ccache.log"
           export CCACHE_COMPILERCHECK="none"
           export CCACHE_BASEDIR="${{ github.workspace }}"
@@ -417,11 +426,13 @@ jobs:
           export CCACHE_MAXSIZE="8G"
           echo "sloppiness = file_stat_matches,include_file_ctime,include_file_mtime,pch_defines,file_macro,time_macros" >> "$CCACHE_DIR/ccache.conf"
 
+          # 2. 提前准备时间劫持环境，defconfig阶段就生效
           cd kernel_workspace/common
           wget -q https://github.com/cctv18/oppo_oplus_realme_sm8750/raw/refs/heads/main/lib/libfakestat.so
           wget -q https://github.com/cctv18/oppo_oplus_realme_sm8750/raw/refs/heads/main/lib/libfaketimeMT.so
           chmod 777 ./*.so
 
+          # 时间环境变量全局生效
           export FAKESTAT="2025-05-25 12:00:00"
           export FAKETIME="@2025-05-25 13:00:00"
           export KBUILD_BUILD_TIMESTAMP="${{ env.FINAL_TIME }}"
@@ -432,6 +443,7 @@ jobs:
           echo "FAKESTAT=$FAKESTAT" >> $GITHUB_ENV
           echo "FAKETIME=$FAKETIME" >> $GITHUB_ENV
 
+          # 3. 编译器wrapper，全程使用时间劫持
           echo '#!/bin/bash' > cc-wrapper
           echo 'export LD_PRELOAD="'$PRELOAD_LIBS'"' >> cc-wrapper
           echo 'export FAKESTAT="'$FAKESTAT'"' >> cc-wrapper
@@ -445,6 +457,7 @@ jobs:
           echo 'export FAKETIME="'$FAKETIME'"' >> ld-wrapper
           echo 'ld.lld "$@"' >> ld-wrapper
 
+          # 时间劫持验证
           echo '#!/bin/bash' > test-wrapper.sh
           echo 'export LD_PRELOAD="'$PRELOAD_LIBS'"' >> test-wrapper.sh
           echo 'export FAKESTAT="'$FAKESTAT'"' >> test-wrapper.sh
@@ -455,12 +468,15 @@ jobs:
           ./test-wrapper.sh date
           ./test-wrapper.sh stat ./Makefile
 
+          # 4. 清理空间
           sudo rm -rf /usr/share/dotnet &
           sudo rm -rf /usr/local/lib/android &
           sudo rm -rf /opt/ghc &
           sudo rm -rf /opt/hostedtoolcache/CodeQL &
           wait
 
+          # 5. 全程使用wrapper构建，确保时间戳锁定
+          echo "=== 开始构建，构建时间锁定为：${{ env.FINAL_TIME }} ==="
           make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="$(pwd)/cc-wrapper" LD="$(pwd)/ld-wrapper" HOSTLD=ld.lld O=out KCFLAGS+=-O2 KCFLAGS+=-Wno-error gki_defconfig &&
           make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="$(pwd)/cc-wrapper" LD="$(pwd)/ld-wrapper" HOSTLD=ld.lld O=out KCFLAGS+=-O2 KCFLAGS+=-Wno-error Image
 
@@ -471,8 +487,7 @@ jobs:
           cat ./out/include/generated/compile.h
           cat ./out/include/generated/utsrelease.h
         if: contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
-
-
+        
       - name: 制作 Anykernel3
         run: |
           git clone https://github.com/skk0042/AnyKernel3 --depth=1
