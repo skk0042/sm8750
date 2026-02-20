@@ -223,11 +223,10 @@ jobs:
         if: contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
 
 
-      - name: 添加KernelSU
-        id: ksu_version
+      - name: 添加Kernelsu
         run: |
           cd kernel_workspace
-          if [[ ${{ github.event.inputs.ksu_type }} == "sukisu" ]]; then
+          if [[ ${{ github.event.inputs.ksu_type }} == "SukiSU_Ultra" ]]; then
             echo "正在配置SukiSU Ultra..."
             curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU-Ultra/refs/heads/main/kernel/setup.sh" | bash -s builtin
             cd ./KernelSU
@@ -263,7 +262,7 @@ jobs:
             grep -A10 "REPO_OWNER" kernel/Kbuild
             grep "KSU_VERSION_FULL" kernel/Kbuild
             echo "SukiSU版本号: v${KSU_API_VERSION}-${GIT_COMMIT_HASH}@cctv18"
-          elif [[ ${{ github.event.inputs.ksu_type }} == "resukisu" ]]; then
+          elif [[ ${{ github.event.inputs.ksu_type }} == "ReSukiSU" ]]; then
             echo "正在配置ReSukiSU..."
             curl -LSs "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/refs/heads/main/kernel/setup.sh" | bash -s main
             echo 'CONFIG_KSU_FULL_NAME_FORMAT="%TAG_NAME%-%COMMIT_SHA%-TG:@SKK0042NB"' >> ./common/arch/arm64/configs/gki_defconfig
