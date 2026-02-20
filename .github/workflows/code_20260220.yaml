@@ -1,4 +1,4 @@
-name: 批量构建 欧加真OKI内核
+name: 批量构建 欧加真OKI内核 全机型通用(SukiSU专属)
 env:
   TZ: Asia/Shanghai
 on:
@@ -12,10 +12,10 @@ on:
         description: 'KernelSU分支(ReSukiSU/SukiSU Ultra,默认ReSukiSU)'
         required: true
         type: choice
-        default: 'ReSukiSU'
+        default: 'resukisu'
         options:
-          - 'ReSukiSU'
-          - 'SukiSUUltra'
+          - 'resukisu'
+          - 'sukisu'
       susfs_enable:
         description: '是否开启susfs(用于增强隐藏环境挂载功能; 可能轻微增加耗电，上游更新导致不稳定时或不需要可关闭)'
         required: true
@@ -263,9 +263,6 @@ jobs:
         if: contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
 
       - name: 清除旧ccache缓存
-        if: inputs.ccache_update && contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "正在清除仓库中的旧 ccache 缓存..."
           if gh cache delete ${{ env.CCACHE_KEY }}-${{ runner.os }}-main -R ${{ github.repository }}; then
@@ -273,6 +270,9 @@ jobs:
           else
             echo "旧缓存不存在或已被清理！"
           fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        if: inputs.ccache_update && contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
 
       - name: 初始化并配置ccache
         run: |
@@ -301,13 +301,12 @@ jobs:
         id: ksu_version
         run: |
           cd kernel_workspace
-          if [[ ${{ github.event.inputs.ksu_type }} == "SukiSUUltra" ]]; then
+          if [[ ${{ github.event.inputs.ksu_type }} == "sukisu" ]]; then
             echo "正在配置SukiSU Ultra..."
             curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU-Ultra/refs/heads/main/kernel/setup.sh" | bash -s builtin
             cd ./KernelSU
             GIT_COMMIT_HASH=$(git rev-parse --short=8 HEAD)
             echo "当前提交哈希: $GIT_COMMIT_HASH"
-            export KSU_VERSION=$KSU_VERSION
             # 最多3次获取API版本号
             for i in {1..3}; do
               KSU_API_VERSION=$(curl -s "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/builtin/kernel/Kbuild" | 
@@ -319,7 +318,7 @@ jobs:
             [ -z "$KSU_API_VERSION" ] && KSU_API_VERSION="3.1.7"
             echo "KSU_API_VERSION=$KSU_API_VERSION" >> $GITHUB_ENV
             # 自定义版本定义
-            VERSION_DEFINITIONS=$'define get_ksu_version_full\nv\\$1-'"$GIT_COMMIT_HASH"$'-TG:@SKK0042NB\nendef\n\nKSU_VERSION_API := '"$KSU_API_VERSION"$'\nKSU_VERSION_FULL := v'"$KSU_API_VERSION"$'-'"$GIT_COMMIT_HASH"$'-TG:@SKK0042NB'
+            VERSION_DEFINITIONS=$'define get_ksu_version_full\nv\\$1-'"$GIT_COMMIT_HASH"$'@cctv18\nendef\n\nKSU_VERSION_API := '"$KSU_API_VERSION"$'\nKSU_VERSION_FULL := v'"$KSU_API_VERSION"$'-'"$GIT_COMMIT_HASH"$'@cctv18'
             # 清理旧版本定义
             sed -i '/define get_ksu_version_full/,/endef/d' kernel/Kbuild
             sed -i '/KSU_VERSION_API :=/d' kernel/Kbuild
@@ -338,7 +337,7 @@ jobs:
             grep -A10 "REPO_OWNER" kernel/Kbuild
             grep "KSU_VERSION_FULL" kernel/Kbuild
             echo "SukiSU版本号: v${KSU_API_VERSION}-${GIT_COMMIT_HASH}@cctv18"
-          elif [[ ${{ github.event.inputs.ksu_type }} == "ReSukiSU" ]]; then
+          elif [[ ${{ github.event.inputs.ksu_type }} == "resukisu" ]]; then
             echo "正在配置ReSukiSU..."
             curl -LSs "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/refs/heads/main/kernel/setup.sh" | bash -s main
             echo 'CONFIG_KSU_FULL_NAME_FORMAT="%TAG_NAME%-%COMMIT_SHA%@cctv18"' >> ./common/arch/arm64/configs/gki_defconfig
@@ -352,7 +351,6 @@ jobs:
         if: contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
 
       - name: 应用 KernelSU & SUSFS 补丁
-        if: inputs.susfs_enable && contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
         run: |
           cd kernel_workspace
           echo "正在添加susfs补丁..."
@@ -369,10 +367,9 @@ jobs:
           fi
           patch -p1 -N -F 3 < 69_hide_stuff.patch || true
           cd ..
-        if: contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
+        if: inputs.susfs_enable && contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
 
       - name: 应用lz4 1.10.0 & zstd 1.5.7补丁
-        if: inputs.lz4_enable && contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
         run: |
           echo "正在添加lz4 1.10.0 & zstd 1.5.7补丁…"
           cd kernel_workspace
@@ -390,10 +387,9 @@ jobs:
             git apply -p1 < 001-lz4-clearMake.patch || true
           fi
           patch -p1 < 002-zstd.patch || true
-        if: contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
+        if: inputs.lz4_enable && contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
 
       - name: 应用 lz4kd 补丁
-        if: inputs.lz4kd_enable && contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
         run: |
           echo "正在添加lz4kd补丁…"
           cd kernel_workspace
@@ -406,9 +402,9 @@ jobs:
           cp -r ../SukiSU_patch/other/zram/lz4k/crypto/* ./crypto
           cp ../SukiSU_patch/other/zram/zram_patch/${{ env.KERNEL_VERSION }}/lz4kd.patch ./
           patch -p1 -F 3 < lz4kd.patch || true
+        if: inputs.lz4kd_enable && contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
 
       - name: 添加SUSFS 配置项
-        if: inputs.susfs_enable && contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
         run: |
           cd kernel_workspace
           echo "CONFIG_KSU_SUSFS=y" >> ./common/arch/arm64/configs/gki_defconfig
@@ -426,6 +422,7 @@ jobs:
           echo "CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y" >> ./common/arch/arm64/configs/gki_defconfig
           echo "CONFIG_KSU_SUSFS_OPEN_REDIRECT=y" >> ./common/arch/arm64/configs/gki_defconfig
           echo "CONFIG_KSU_SUSFS_SUS_MAP=y" >> ./common/arch/arm64/configs/gki_defconfig
+        if: inputs.susfs_enable && contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
 
       - name: 添加 KSU & 其他通用配置项
         run: |
@@ -458,7 +455,6 @@ jobs:
         if: contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
 
       - name: 启用网络功能增强优化配置
-        if: inputs.better_net && contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
         run: |
           cd kernel_workspace
           echo "CONFIG_BPF_STREAM_PARSER=y" >> ./common/arch/arm64/configs/gki_defconfig
@@ -488,6 +484,7 @@ jobs:
           cd common
           wget https://github.com/cctv18/oppo_oplus_realme_sm8650/raw/refs/heads/main/other_patch/config.patch
           patch -p1 -F 3 < config.patch || true
+        if: inputs.better_net && contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
 
       - name: 添加 BBR 等一系列拥塞控制算法
         run: |
@@ -526,14 +523,13 @@ jobs:
         if: contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
 
       - name: 启用Re-Kernel支持
-        if: inputs.rekernel_enable && contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
         run: |
           echo "正在启用Re-Kernel支持…"
           cd kernel_workspace
           echo "CONFIG_REKERNEL=y" >> ./common/arch/arm64/configs/gki_defconfig
+        if: inputs.rekernel_enable && contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
 
       - name: 启用内核级基带保护
-        if: inputs.baseband_guard && contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
         run: |
           echo "正在启用内核级基带保护支持…"
           cd kernel_workspace
@@ -541,6 +537,7 @@ jobs:
           cd ./common
           curl -sSL https://github.com/cctv18/Baseband-guard/raw/master/setup.sh | bash
           sed -i '/^config LSM$/,/^help$/{ /^[[:space:]]*default/ { /baseband_guard/! s/selinux/selinux,baseband_guard/ } }' security/Kconfig
+        if: inputs.baseband_guard && contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
 
       - name: 设置内核名称后缀&版本锁定
         run: |
@@ -593,8 +590,8 @@ jobs:
           
           cd kernel_workspace/common
           # 时间劫持so库
-          wget https://github.com/cctv18/oppo_oplus_realme_sm8650/raw/refs/heads/main/lib/libfakestat.so
-          wget https://github.com/cctv18/oppo_oplus_realme_sm8650/raw/refs/heads/main/lib/libfaketimeMT.so
+          wget -q https://github.com/cctv18/oppo_oplus_realme_sm8650/raw/refs/heads/main/lib/libfakestat.so
+          wget -q https://github.com/cctv18/oppo_oplus_realme_sm8650/raw/refs/heads/main/lib/libfaketimeMT.so
           chmod 777 ./*.so
           
           # 时间环境变量（核心构建时间控制）
@@ -648,11 +645,12 @@ jobs:
         if: contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
 
       - name: 保存新的 ccache 缓存
-        if: (inputs.ccache_update || steps.ccache-restore.outputs.cache-hit != 'true') && contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
         uses: actions/cache/save@v4
         with:
           path: ${{ env.CCACHE_DIR }}
           key: ${{ env.CCACHE_KEY }}-${{ runner.os }}-main
+        if: (inputs.ccache_update || steps.ccache-restore.outputs.cache-hit != 'true') && contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
+
 
       - name: 制作 Anykernel3
         run: |
@@ -687,4 +685,3 @@ jobs:
         with:
           name: ${{ github.event.inputs.ksu_type }}_${{ env.KSUVER }}_${{ env.CHIPSET }}
           path: ./AnyKernel3/*
-
