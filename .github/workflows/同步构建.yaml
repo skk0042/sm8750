@@ -360,7 +360,6 @@ jobs:
           echo "CONFIG_KSU_SUSFS_SUS_MAP=y" >> ./arch/arm64/configs/gki_defconfig
 
           # IO调度器配置
-          # IO调度器配置
           if [[ ${{ env.KERNEL_VERSION }} == 6.6 ]]; then
            echo "启用ADIOS IO调度器（6.6内核）"
            echo "CONFIG_MQ_IOSCHED_ADIOS=y" >> ./arch/arm64/configs/gki_defconfig
@@ -399,7 +398,7 @@ jobs:
           tail -5 ./scripts/setlocalversion
         if: contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
 
-      - name: 【修复时间核心】构建内核（全程时间劫持+时间戳锁定）
+      - name: 构建内核
         run: |
           WORKDIR="$(pwd)"
           export PATH="/usr/lib/ccache:$PATH"
@@ -409,109 +408,74 @@ jobs:
           CLANG_VERSION="$($CLANG_DIR/clang --version | head -n 1)"
           LLD_VERSION="$($CLANG_DIR/ld.lld --version | head -n 1)"
           pahole_version=$(pahole --version 2>/dev/null | head -n1); [ -z "$pahole_version" ] && echo "pahole版本：未安装" || echo "pahole版本：$pahole_version"
-
-          # 1. ccache配置
           export CCACHE_LOGFILE="${{ github.workspace }}/kernel_workspace/ccache.log"
           export CCACHE_COMPILERCHECK="none"
           export CCACHE_BASEDIR="${{ github.workspace }}"
           export CCACHE_NOHASHDIR="true"
           export CCACHE_HARDLINK="true"
           export CCACHE_DIR="${{ env.CCACHE_DIR }}"
-          export CCACHE_MAXSIZE="8G"
+          export CCACHE_MAXSIZE="3G"
           echo "sloppiness = file_stat_matches,include_file_ctime,include_file_mtime,pch_defines,file_macro,time_macros" >> "$CCACHE_DIR/ccache.conf"
-
           cd kernel_workspace/common
-          wget -q https://github.com/cctv18/oppo_oplus_realme_sm8750/raw/refs/heads/main/lib/libfakestat.so
-          wget -q https://github.com/cctv18/oppo_oplus_realme_sm8750/raw/refs/heads/main/lib/libfaketimeMT.so
+          wget https://github.com/cctv18/oppo_oplus_realme_sm8750/raw/refs/heads/main/lib/libfakestat.so
+          wget https://github.com/cctv18/oppo_oplus_realme_sm8750/raw/refs/heads/main/lib/libfaketimeMT.so
           chmod 777 ./*.so
-
-          # 时间环境变量全局生效
           export FAKESTAT="2025-05-25 12:00:00"
           export FAKETIME="@2025-05-25 13:00:00"
-          export KBUILD_BUILD_TIMESTAMP="${{ env.FINAL_TIME }}"
-          export KBUILD_BUILD_USER="root"
-          export KBUILD_BUILD_HOST="build"
-          SO_DIR=$(pwd)
-          export PRELOAD_LIBS="$SO_DIR/libfakestat.so $SO_DIR/libfaketimeMT.so"
           echo "FAKESTAT=$FAKESTAT" >> $GITHUB_ENV
           echo "FAKETIME=$FAKETIME" >> $GITHUB_ENV
-
+          SO_DIR=$(pwd)
+          export PRELOAD_LIBS="$SO_DIR/libfakestat.so $SO_DIR/libfaketimeMT.so"
           echo '#!/bin/bash' > cc-wrapper
           echo 'export LD_PRELOAD="'$PRELOAD_LIBS'"' >> cc-wrapper
           echo 'export FAKESTAT="'$FAKESTAT'"' >> cc-wrapper
           echo 'export FAKETIME="'$FAKETIME'"' >> cc-wrapper
-          echo 'export KBUILD_BUILD_TIMESTAMP="${{ env.FINAL_TIME }}"' >> cc-wrapper
           echo 'ccache clang "$@"' >> cc-wrapper
-
           echo '#!/bin/bash' > ld-wrapper
           echo 'export LD_PRELOAD="'$PRELOAD_LIBS'"' >> ld-wrapper
           echo 'export FAKESTAT="'$FAKESTAT'"' >> ld-wrapper
           echo 'export FAKETIME="'$FAKETIME'"' >> ld-wrapper
           echo 'ld.lld "$@"' >> ld-wrapper
-
-          # 时间劫持验证
           echo '#!/bin/bash' > test-wrapper.sh
           echo 'export LD_PRELOAD="'$PRELOAD_LIBS'"' >> test-wrapper.sh
           echo 'export FAKESTAT="'$FAKESTAT'"' >> test-wrapper.sh
           echo 'export FAKETIME="'$FAKETIME'"' >> test-wrapper.sh
           echo 'echo ">>> Wrapper 内部环境检查完毕."' >> test-wrapper.sh
           echo 'exec "$@"' >> test-wrapper.sh
-          chmod +x test-wrapper.sh cc-wrapper ld-wrapper
+          chmod +x test-wrapper.sh
           ./test-wrapper.sh date
           ./test-wrapper.sh stat ./Makefile
-
-          # 4. 清理空间
+          chmod +x cc-wrapper ld-wrapper
+          LD_PRELOAD=$PRELOAD_LIBS stat ./Makefile
+          export KBUILD_BUILD_TIMESTAMP="${KERNEL_TIME}"
           sudo rm -rf /usr/share/dotnet &
           sudo rm -rf /usr/local/lib/android &
           sudo rm -rf /opt/ghc &
           sudo rm -rf /opt/hostedtoolcache/CodeQL &
-          wait
-
-          # 5. 【核心修复】defconfig和编译全程使用wrapper，确保时间戳全程锁定
-          echo "=== 开始构建，构建时间锁定为：${{ env.FINAL_TIME }} ==="
-          make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="$(pwd)/cc-wrapper" LD="$(pwd)/ld-wrapper" HOSTLD=ld.lld O=out KCFLAGS+=-O2 KCFLAGS+=-Wno-error gki_defconfig &&
+          make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" LD="ld.lld" HOSTLD=ld.lld O=out KCFLAGS+=-O2 KCFLAGS+=-Wno-error gki_defconfig &&
           make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="$(pwd)/cc-wrapper" LD="$(pwd)/ld-wrapper" HOSTLD=ld.lld O=out KCFLAGS+=-O2 KCFLAGS+=-Wno-error Image
-
-          # 构建后验证
-          echo "=== 构建完成，ccache状态 ==="
+          LD_PRELOAD=$PRELOAD_LIBS stat ./Makefile
+          echo "ccache状态："
           ccache -s
-          echo "=== 生成的内核版本信息 ==="
-          cat ./out/include/generated/compile.h
-          cat ./out/include/generated/utsrelease.h
         if: contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
 
-      - name: 应用KPM并修补内核
-        run: |
-          if [[ ${{ github.event.inputs.ksu_type }} == "SukiSU_Ultra" ]]; then
-            echo "正在应用KPM并修补内核..."
-            cd kernel_workspace/common/out/arch/arm64/boot
-            curl -LO https://github.com/SukiSU-Ultra/SukiSU_KernelPatch_patch/releases/latest/download/patch_linux
-            chmod +x patch_linux
-            ./patch_linux
-            rm -f Image
-            mv oImage Image
-          fi
-        if: contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
 
-      - name: 制作 Anykernel3（文件5时间锁定逻辑）
+      - name: 制作 Anykernel3
         run: |
-          cd kernel_workspace
-          # 1. 克隆纯净AK3仓库，清理git元数据
           git clone https://github.com/skk0042/AnyKernel3 --depth=1
-          rm -rf ./AnyKernel3/.git ./AnyKernel3/.gitignore ./AnyKernel3/.github ./AnyKernel3/README*
-          mkdir -p out/Final-Image-Find/
+          rm -rf ./AnyKernel3/.git
+          mkdir -p kernel_workspace/out/Final-Image-Find/
           
-          # 2. 校验并复制内核镜像
-          image_path=$(find "./common/out/" -type f -name "Image" -print -quit)
+          image_path=$(find "./kernel_workspace/common/out/" -type f -name "Image" -print -quit)
           if [ -z "$image_path" ]; then
             echo "❌ 未找到Image文件，构建失败"
-            ls -la ./common/out/
+            ls -la ./kernel_workspace/common/out/
             exit 1
           fi
-          cp "$image_path" ./AnyKernel3/Image
-          cp "$image_path" out/Final-Image-Find/Image
           
-          # 3. 补充sm8750专属文件
+          cp "$image_path" ./AnyKernel3/Image
+          cp "$image_path" kernel_workspace/out/Final-Image-Find/Image
+          
           if [[ "${{ env.CHIPSET }}" == "sm8750" ]]; then
             dir2=$(dirname "$image_path")/
             for file in dtbo.img system_dlkm.erofs.img; do
@@ -522,23 +486,11 @@ jobs:
               fi
             done
           fi
-
-          cd AnyKernel3
-          find ./ -type f -exec touch -d "${{ env.FINAL_TIME }}" {} \;
-          find ./ -type d -exec touch -d "${{ env.FINAL_TIME }}" {} \;
-          
-          # 时间锁定验证
-          echo "内核构建基准时间：${{ env.FINAL_TIME }}"
-          echo "Image镜像文件时间：$(stat -c %y ./Image)"
-          echo "META-INF目录时间：$(stat -c %y ./META-INF)"
-
-          # 5. 纯净打包，去除zip元数据
-          zip --no-extra --quiet -r ../AnyKernel3_${{ github.event.inputs.ksu_type }}_${{ env.CHIPSET }}_${{ env.FINAL_SUFFIX }}.zip ./*
         if: contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
-
+        
       - name: 上传 Anykernel3
         uses: actions/upload-artifact@v4
         with:
           name: ${{ github.event.inputs.ksu_type }}_${{ env.KSUVER }}_${{ env.CHIPSET }}
-          path: ./kernel_workspace/AnyKernel3*.zip
+          path: ./AnyKernel3/*
         if: contains(format(',{0},', github.event.inputs.batch_devices), format(',{0},', matrix.DEVICE))
